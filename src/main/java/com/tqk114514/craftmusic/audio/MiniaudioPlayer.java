@@ -40,8 +40,12 @@ public final class MiniaudioPlayer implements AutoCloseable {
         if (rc == 0) {
             this.lastPlayedAbsolutePath = absolutePath;
             this.paused = false;
-            // 恢复最近一次音量
-            try { nSetVolume(this.volume); } catch (Throwable ignored) {}
+            // 确保与配置音量一致（避免首次播放为 100%）
+            try {
+                float cfg = com.tqk114514.craftmusic.client.ClientConfig.getVolume();
+                this.volume = Math.max(0f, Math.min(1f, cfg));
+                nSetVolume(this.volume);
+            } catch (Throwable ignored) {}
         }
         return rc;
     }
@@ -59,6 +63,12 @@ public final class MiniaudioPlayer implements AutoCloseable {
         this.playing = true;
         this.lastPlayedAbsolutePath = null;
         this.paused = false;
+        // 同步配置音量
+        try {
+            float cfg = com.tqk114514.craftmusic.client.ClientConfig.getVolume();
+            this.volume = Math.max(0f, Math.min(1f, cfg));
+            nSetVolume(this.volume);
+        } catch (Throwable ignored) {}
     }
 
     @Override
@@ -126,6 +136,12 @@ public final class MiniaudioPlayer implements AutoCloseable {
         return this.volume;
     }
 
+    // 读取频谱能量，返回有效段数。bands 建议 32 或 64。
+    public int getSpectrum(float[] out, int bands) {
+        if (!outputReady || out == null || bands <= 0) return 0;
+        return nGetSpectrum(out, bands);
+    }
+
     private static native boolean nInit(int sampleRate, int channels);
     private static native int nPlayFile(String absolutePath);
     private static native void nStop();
@@ -138,5 +154,6 @@ public final class MiniaudioPlayer implements AutoCloseable {
     private static native void nResume();
     private static native void nSetVolume(float v);
     private static native float nGetVolume();
+    private static native int nGetSpectrum(float[] out, int bands);
 }
 
