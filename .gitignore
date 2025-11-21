@@ -28,3 +28,6 @@ repo
 # version management
 gradle.properties.*.bak
 *.orig
+
+# local archive of historical builds (kept outside version control)
+本地/
