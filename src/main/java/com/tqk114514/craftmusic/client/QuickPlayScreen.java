@@ -2,18 +2,24 @@ package com.tqk114514.craftmusic.client;
 
 import com.tqk114514.craftmusic.CraftMusic;
 import com.tqk114514.craftmusic.audio.MiniaudioPlayer;
+import com.tqk114514.craftmusic.client.settings.SettingsScreen;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import javax.annotation.Nonnull;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class QuickPlayScreen extends Screen {
     private final MiniaudioPlayer player;
     private TrackList trackList;
+    private EditBox searchBox;   // 搜索框
     private Button prevBtn;      // 保留引用以更新启用状态
     private Button playToggleBtn; // 更新按钮文本
     private Button nextBtn;      // 保留引用以更新启用状态
@@ -21,6 +27,7 @@ public class QuickPlayScreen extends Screen {
     private Button lyricsBtn;    // 悬浮歌词开关
     private Button openFolderBtn; // 打开文件夹
     private Button settingsBtn;   // 设置（保留占位）
+    private List<MusicLibrary.TrackInfo> filteredTracks = new ArrayList<>(); // 过滤后的歌曲列表
 
     private int selectedIndex = -1;
     private boolean isPlaying = false;
@@ -28,7 +35,7 @@ public class QuickPlayScreen extends Screen {
     private long lastClickMs = 0L;
     private Path lastClickedPath = null;
     private static final int DOUBLE_CLICK_MS = 350;
-    private int seekBarX = 10;
+    private int seekBarX = 2;  // 与其他元素对齐
     private int seekBarY;
     private int seekBarW;
     private int seekBarH = 6;
@@ -60,9 +67,9 @@ public class QuickPlayScreen extends Screen {
     // 无歌词时提示的缩放动画
     private boolean noLyricsActive = false;
     private long noLyricsAnimStartMs = 0L;
-    // 列表区域上下界，用于歌词面板对齐
-    private int listTopY;
-    private int listBottomY;
+    // 歌词面板位置
+    private int lyricsTopY;    // 歌词面板顶部位置
+    private int lyricsBottomY; // 歌词面板底部位置
 
     public QuickPlayScreen(MiniaudioPlayer player) {
         super(Component.literal("CraftMusic Quick Play"));
@@ -74,17 +81,40 @@ public class QuickPlayScreen extends Screen {
         // 进入界面时刷新库
         MusicLibrary.scan();
 
-        int listTop = 40;
+        // 添加搜索框，调整左侧列表位置
+        int searchBoxHeight = 20;
+        int searchBoxY = 40;
+        int searchBoxGap = 5;
+        int listTop = searchBoxY + searchBoxHeight + searchBoxGap; // 左侧列表往下移动
         int controlsHeight = 28; // 底部控制区高度
         int listBottomPadding = controlsHeight + 36; // 额外上移 12px（原为 +24）
         int listHeight = Math.max(20, this.height - listTop - listBottomPadding);
-        this.listTopY = listTop;
-        this.listBottomY = listTop + listHeight;
+        
+        // 右侧歌词面板保持原来的高度，不受搜索框影响
+        int lyricsTop = 40; // 原始高度
+        int lyricsHeight = Math.max(20, this.height - lyricsTop - listBottomPadding);
+        this.lyricsTopY = lyricsTop;
+        this.lyricsBottomY = lyricsTop + lyricsHeight;
+        
         // 左右分栏
         int midGap = 10;
-        int leftWidth = (this.width - 20 - midGap) / 2; // 10 左右边距
-        trackList = new TrackList(minecraft, leftWidth, listHeight, listTop, 20);
+        int rightPadding = 10; // 只保留右边距
+        int leftWidth = (this.width - rightPadding - midGap) / 2; // 左边贴边，右边10px边距
+        
+        // 创建搜索框（与列表对齐）
+        searchBox = new EditBox(this.font, 2, searchBoxY, leftWidth - 2, searchBoxHeight, Component.translatable("craftmusic.ui.search"));
+        searchBox.setHint(Component.translatable("craftmusic.ui.search.hint"));
+        searchBox.setResponder(text -> {
+            filterTracks(text);
+        });
+        addRenderableWidget(searchBox);
+        
+        // 创建列表
+        trackList = new TrackList(minecraft, leftWidth - 2, listHeight, listTop, 20);  // 宽度减2补偿左边距
         addRenderableWidget(trackList);
+        
+        // 初始化过滤列表
+        filteredTracks = new ArrayList<>(MusicLibrary.getTrackInfos());
 
         // 顶部按钮：刷新 / 歌词 / 打开文件夹 / 设置 / 关闭
         int topY = 10;
@@ -99,7 +129,9 @@ public class QuickPlayScreen extends Screen {
         // 刷新
         addRenderableWidget(Button.builder(Component.translatable("craftmusic.ui.refresh"), b -> {
             MusicLibrary.scan();
-            trackList.reloadInfos(MusicLibrary.getTrackInfos());
+            filteredTracks = new ArrayList<>(MusicLibrary.getTrackInfos());
+            searchBox.setValue("");
+            trackList.reloadInfos(filteredTracks);
         }).bounds(x, topY, eachW, 20).build());
         x += eachW + gap;
 
@@ -132,7 +164,7 @@ public class QuickPlayScreen extends Screen {
 
         // 底部控制条：上一首 / 启停 / 下一首 / 音量条 / 模式（自适应）
         int bottomY = this.height - controlsHeight;
-        int leftPadB = 10;
+        int leftPadB = 2;  // 与列表对齐，留2px边距
         int rightPadB = 10;
         int gapB = 5;
         int btnCountB = 5; // prev, play, next, vol, mode
@@ -174,15 +206,20 @@ public class QuickPlayScreen extends Screen {
 
         // 进度条区域
         seekBarY = bottomY - 12;
-        seekBarW = this.width - 10 - 10; // 左右 10 像素边距
+        seekBarW = this.width - 2 - 10; // 左边2px，右边10px边距
 
         // 初始选择第一项（若有）
-        List<Path> ts = MusicLibrary.getTracks();
-        if (ts != null && !ts.isEmpty()) {
+        if (!filteredTracks.isEmpty()) {
             selectedIndex = 0;
             trackList.selectIndex(0);
         }
         updateControlsEnabled();
+        // 确保播放器音量与配置一致（避免重进游戏后实际为 100%）
+        try {
+            if (player != null && player.isOutputReady()) {
+                player.setVolume(ClientConfig.getVolume());
+            }
+        } catch (Throwable ignored) {}
         // 同步播放状态（避免重进界面按钮文本不符）
         if (player != null && player.isOutputReady()) {
             isPlaying = player.isPlaying();
@@ -211,11 +248,15 @@ public class QuickPlayScreen extends Screen {
     @Override
     public void render(@Nonnull net.minecraft.client.gui.GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(gfx, mouseX, mouseY, partialTick);
+        // 频谱作为“背景”先绘制，避免覆盖按钮/列表等UI
+        if (ClientConfig.isSpectrumEnabled() && player != null && player.isOutputReady()) {
+            drawSpectrumBar(gfx);
+        }
         super.render(gfx, mouseX, mouseY, partialTick);
-        gfx.drawString(this.font, Component.translatable("craftmusic.ui.title"), 10, 10 - 9, 0xFFFFFF, false);
+        gfx.drawString(this.font, Component.translatable("craftmusic.ui.title"), 2, 10 - 9, 0xFFFFFF, false);
         if (currentPath != null && (isPlaying || (player != null && player.isPaused()))) {
             String name = currentPath.getFileName().toString();
-            int textX = 10;
+            int textX = 2;  // 与其他元素对齐
             int textY = seekBarY - 12; // 显示在进度条上方，避免与底部按钮冲突
             gfx.drawString(this.font, Component.literal(name), textX, textY, 0xFFFFFF, false);
         }
@@ -229,10 +270,42 @@ public class QuickPlayScreen extends Screen {
         drawLyricsPanel(gfx);
     }
 
+    private final float[] spectrumBuf = new float[64];
+    private long lastSpectrumFetchMs = 0L;
+    private void drawSpectrumBar(net.minecraft.client.gui.GuiGraphics gfx) {
+        int bands = 64;
+        long now = System.currentTimeMillis();
+        if (now - lastSpectrumFetchMs >= 33) { // ~30FPS
+            try { player.getSpectrum(spectrumBuf, bands); } catch (Throwable ignored) {}
+            lastSpectrumFetchMs = now;
+        }
+        int x0 = 2;  // 与列表等元素对齐，留2px边距
+        int x1 = this.width - 10;  // 右边保留10px边距
+        int yBottom = this.height - 4; // 靠近底缘
+        int barAreaHeight = yBottom; // 以屏幕高度为可用范围，不再额外限制
+        int width = x1 - x0;
+        int barGap = Math.max(1, width / (bands * 8));
+        int barW = Math.max(1, (width - (bands - 1) * barGap) / bands);
+        // 去除背景框，仅绘制柱状
+        float volScale = (player != null) ? Math.max(0f, Math.min(1f, player.getVolume())) : com.tqk114514.craftmusic.client.ClientConfig.getVolume();
+        for (int i = 0; i < bands; i++) {
+            float v = spectrumBuf[i] * volScale; // 随音量缩放振幅，不改变最大高度
+            if (v < 0f) v = 0f; if (v > 1f) v = 1f;
+            int h = (int)(v * (barAreaHeight - 4));
+            int bx = x0 + i * (barW + barGap);
+            int by = yBottom - h;
+            int color = 0xFFFFFFFF; // 纯白色
+            gfx.fill(bx, by, bx + barW, yBottom, color);
+        }
+    }
+
     class TrackList extends ObjectSelectionList<TrackEntry> {
-        private final int left = 10;
+        private final int left = 2;  // 稍微留2px边距，避免文字超出
+        private final int listWidth;
+        
         public TrackList(Minecraft mc, int width, int height, int top, int itemHeight) {
             super(mc, width, height, top, itemHeight);
+            this.listWidth = width;
             reloadInfos(MusicLibrary.getTrackInfos());
         }
 
@@ -241,14 +314,14 @@ public class QuickPlayScreen extends Screen {
             return this.left;
         }
 
-        // 在 1.21.4 上签名可能变化，这里避免使用 @Override 以保持兼容
+        // Minecraft 1.21.4 中不再需要覆寫此方法
         protected int getScrollbarPosition() {
-            return this.getRowLeft() + this.width - 6;
+            return this.left + this.listWidth - 6;
         }
 
         @Override
         public int getRowWidth() {
-            return this.width - 20;
+            return this.listWidth - 8; // 给滚动条留出空间
         }
 
         void reload(List<Path> paths) {
@@ -271,6 +344,19 @@ public class QuickPlayScreen extends Screen {
             }
             if (selectedIndex >= 0 && selectedIndex < getItemCount()) {
                 setSelected(getEntry(selectedIndex));
+            }
+            QuickPlayScreen.this.updateControlsEnabled();
+        }
+        
+        void reloadFilteredInfos(List<MusicLibrary.TrackInfo> infos) {
+            clearEntries();
+            int i = 0;
+            for (MusicLibrary.TrackInfo info : infos) {
+                addEntry(new TrackEntry(this, info.getAudioPath(), i++, info.hasLyrics()));
+            }
+            if (!infos.isEmpty()) {
+                selectedIndex = 0;
+                setSelected(getEntry(0));
             }
             QuickPlayScreen.this.updateControlsEnabled();
         }
@@ -309,7 +395,9 @@ public class QuickPlayScreen extends Screen {
             String suffix = hasLyrics ? Component.translatable("craftmusic.ui.has_lyrics").getString() : Component.translatable("craftmusic.ui.no_lyrics").getString();
             int fh = QuickPlayScreen.this.font.lineHeight;
             int textY = y + Math.max(0, (entryHeight - fh) / 2);
-            gfx.drawString(QuickPlayScreen.this.font, name + "  [" + suffix + "]", x + 6, textY, 0xFFFFFF, false);
+            // 使用传入的x参数作为基准，这是列表项的实际渲染位置
+            int textX = x + 6; // 使用传入的x坐标，加6px内边距
+            gfx.drawString(QuickPlayScreen.this.font, name + "  [" + suffix + "]", textX, textY, 0xFFFFFF, false);
         }
 
         @Override
@@ -340,21 +428,19 @@ public class QuickPlayScreen extends Screen {
     }
 
     private void playPrev() {
-        List<Path> ts = MusicLibrary.getTracks();
-        if (ts == null || ts.isEmpty()) return;
-        int current = resolveCurrentIndex(ts);
+        if (filteredTracks.isEmpty()) return;
+        int current = resolveCurrentIndexFromFiltered();
         if (current < 0) current = 0;
-        int idx = (current - 1 + ts.size()) % ts.size();
-        playTrack(ts.get(idx), idx);
+        int idx = (current - 1 + filteredTracks.size()) % filteredTracks.size();
+        playTrack(filteredTracks.get(idx).getAudioPath(), idx);
     }
 
     private void playNext() {
-        List<Path> ts = MusicLibrary.getTracks();
-        if (ts == null || ts.isEmpty()) return;
-        int current = resolveCurrentIndex(ts);
+        if (filteredTracks.isEmpty()) return;
+        int current = resolveCurrentIndexFromFiltered();
         if (current < 0) current = -1;
-        int idx = (current + 1 + ts.size()) % ts.size();
-        playTrack(ts.get(idx), idx);
+        int idx = (current + 1 + filteredTracks.size()) % filteredTracks.size();
+        playTrack(filteredTracks.get(idx).getAudioPath(), idx);
     }
 
     private void togglePlayPause() {
@@ -373,10 +459,9 @@ public class QuickPlayScreen extends Screen {
             return;
         }
         // 未在播放/未暂停，则播放当前选择或第一首
-        List<Path> ts = MusicLibrary.getTracks();
-        if (ts.isEmpty()) return;
+        if (filteredTracks.isEmpty()) return;
         int idx = selectedIndex >= 0 ? selectedIndex : 0;
-        playTrack(ts.get(idx), idx);
+        playTrack(filteredTracks.get(idx).getAudioPath(), idx);
     }
 
     private void playTrack(Path p, int idx) {
@@ -406,10 +491,8 @@ public class QuickPlayScreen extends Screen {
     }
 
     private void updateControlsEnabled() {
-        List<Path> ts = MusicLibrary.getTracks();
-        if (ts == null) ts = java.util.Collections.emptyList();
-        boolean hasTracks = !ts.isEmpty();
-        boolean multi = hasTracks && ts.size() > 1;
+        boolean hasTracks = !filteredTracks.isEmpty();
+        boolean multi = hasTracks && filteredTracks.size() > 1;
         if (prevBtn != null) prevBtn.active = multi;
         if (nextBtn != null) nextBtn.active = multi;
         if (playToggleBtn != null) playToggleBtn.active = hasTracks && player != null && player.isOutputReady();
@@ -569,20 +652,21 @@ public class QuickPlayScreen extends Screen {
     }
 
     private void drawLyricsPanel(net.minecraft.client.gui.GuiGraphics gfx) {
-        // 左右分栏：左列表宽度为 (width - 20 - gap)/2
+        // 左右分栏：左列表贴左边，右边保留10px边距
         int gap = 10;
-        int leftWidth = (this.width - 20 - gap) / 2;
-        int x0 = 10 + leftWidth + gap;
+        int rightPadding = 10;
+        int leftWidth = (this.width - rightPadding - gap) / 2;
+        int x0 = leftWidth + gap;  // 左列表宽度 + 中间间隔
         int x1 = this.width - 10;
-        int top = this.listTopY;
-        int bottom = this.listBottomY;
+        int top = this.lyricsTopY;    // 使用歌词面板专用的高度
+        int bottom = this.lyricsBottomY;
         gfx.fill(x0, top, x1, bottom, 0x90000000);
 
         // 固定显示歌词（按钮不再控制）。若无歌词，显示“无歌词/纯音乐”并居中放大 8%。
         List<Lyrics.Line> lines = (currentLyrics != null) ? currentLyrics.getLines() : java.util.Collections.emptyList();
         if (lines.isEmpty()) {
             String txt = Component.translatable("craftmusic.ui.no_lyrics_or_instrumental").getString();
-            int centerY = top + 8 + (bottom - top - 16) / 2 - this.font.lineHeight / 2;
+            int centerY = this.lyricsTopY + 8 + (this.lyricsBottomY - this.lyricsTopY - 16) / 2 - this.font.lineHeight / 2;
             int midX = (x0 + x1) / 2;
             if (ClientConfig.isLyricEffects()) {
                 long now = System.currentTimeMillis();
@@ -629,7 +713,7 @@ public class QuickPlayScreen extends Screen {
             }
         }
         int lineH = this.font.lineHeight + 2;
-        int centerY = top + 8 + (bottom - top - 16) / 2 - this.font.lineHeight / 2;
+        int centerY = this.lyricsTopY + 8 + (this.lyricsBottomY - this.lyricsTopY - 16) / 2 - this.font.lineHeight / 2;
         int midX = (x0 + x1) / 2;
         // 缩放动画：当当前歌词行变化时，前一行缩回，当前行放大
         if (ClientConfig.isLyricEffects()) {
@@ -644,13 +728,13 @@ public class QuickPlayScreen extends Screen {
         }
         // 使用连续滚动位置绘制
         float drawCenterIndex = (lyricScrollPos < 0f) ? (curIdx < 0 ? 0f : curIdx) : lyricScrollPos;
-        int visiblePx = Math.max(0, (bottom - top - 16)); // 上下各 8px 内边距
+        int visiblePx = Math.max(0, (this.lyricsBottomY - this.lyricsTopY - 16)); // 上下各 8px 内边距
         int approxVisibleLines = Math.max(1, visiblePx / lineH + 1);
         int half = approxVisibleLines / 2;
         int firstIdx = Math.max(0, (int)Math.floor(drawCenterIndex) - half);
         int lastIdx = Math.min(lines.size() - 1, (int)Math.ceil(drawCenterIndex) + half);
-        int textTopBound = top + 8;
-        int textBottomBound = bottom - 8 - this.font.lineHeight;
+        int textTopBound = this.lyricsTopY + 8;
+        int textBottomBound = this.lyricsBottomY - 8 - this.font.lineHeight;
         for (int i = firstIdx; i <= lastIdx; i++) {
             float diff = i - drawCenterIndex;
             int y = Math.round(centerY + diff * lineH);
@@ -704,6 +788,32 @@ public class QuickPlayScreen extends Screen {
         pose.scale(scale, scale, 1f);
         gfx.drawString(this.font, text, 0, 0, argb, false);
         pose.popPose();
+    }
+    
+    private void filterTracks(String searchText) {
+        if (searchText == null || searchText.isBlank()) {
+            filteredTracks = new ArrayList<>(MusicLibrary.getTrackInfos());
+        } else {
+            String lowerSearch = searchText.toLowerCase(Locale.ROOT);
+            filteredTracks = MusicLibrary.getTrackInfos().stream()
+                .filter(info -> {
+                    String fileName = info.getAudioPath().getFileName().toString().toLowerCase(Locale.ROOT);
+                    return fileName.contains(lowerSearch);
+                })
+                .collect(java.util.stream.Collectors.toList());
+        }
+        trackList.reloadFilteredInfos(filteredTracks);
+    }
+    
+    private int resolveCurrentIndexFromFiltered() {
+        if (currentPath == null) return -1;
+        String current = currentPath.toAbsolutePath().toString();
+        for (int i = 0; i < filteredTracks.size(); i++) {
+            if (filteredTracks.get(i).getAudioPath().toAbsolutePath().toString().equalsIgnoreCase(current)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private void cycleMode() {
@@ -774,19 +884,6 @@ public class QuickPlayScreen extends Screen {
 
     private void refreshLyricsControls() {
         if (lyricsBtn != null) lyricsBtn.active = true; // 始终可点但无功能
-    }
-
-    private int resolveCurrentIndex(List<Path> ts) {
-        if (selectedIndex >= 0 && selectedIndex < ts.size()) return selectedIndex;
-        if (player != null) {
-            String last = player.getLastPlayedAbsolutePath();
-            if (last != null) {
-                for (int i = 0; i < ts.size(); i++) {
-                    if (ts.get(i).toAbsolutePath().toString().equalsIgnoreCase(last)) return i;
-                }
-            }
-        }
-        return -1;
     }
 
     private void openLibraryFolder() {

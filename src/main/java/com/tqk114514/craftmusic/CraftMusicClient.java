@@ -8,6 +8,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import com.tqk114514.craftmusic.audio.MiniaudioPlayer;
 import com.tqk114514.craftmusic.client.QuickPlayScreen;
+import com.tqk114514.craftmusic.client.settings.lyrics.FloatingLyricsPositionScreen;
 import com.tqk114514.craftmusic.client.MusicLibrary;
 import net.minecraft.client.Minecraft;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
@@ -30,15 +31,21 @@ import com.tqk114514.craftmusic.client.LrcParser;
 import com.tqk114514.craftmusic.client.ClientConfig;
 
 @Mod(value = CraftMusic.MODID, dist = Dist.CLIENT)
-@EventBusSubscriber(modid = CraftMusic.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber(modid = CraftMusic.MODID, value = Dist.CLIENT)
 public class CraftMusicClient {
     private static MiniaudioPlayer PLAYER;
         private static KeyMapping OPEN_UI_KEY;
     private static volatile Lyrics overlayLyrics = Lyrics.empty();
     private static volatile String overlayLyricsForPath = null;
-    public CraftMusicClient(ModContainer container) {}
+    private static volatile float lastAppliedVolume = -1f;
+    
+    public CraftMusicClient(ModContainer container) {
+        // 注册 Mod Bus 事件
+        container.getEventBus().addListener(this::onClientSetup);
+        container.getEventBus().addListener(this::registerKeyMappings);
+    }
 
-    static void onClientSetup(FMLClientSetupEvent event) {
+    private void onClientSetup(FMLClientSetupEvent event) {
         CraftMusic.LOGGER.info("CraftMusic client setup initialized");
         // 先加载配置
         com.tqk114514.craftmusic.client.ClientConfig.initAndLoad();
@@ -54,6 +61,7 @@ public class CraftMusicClient {
                 CraftMusic.LOGGER.info("CraftMusic applied initial volume: {}", cfgVol);
             } catch (Throwable ignored) {}
         }
+        lastAppliedVolume = cfgVol;
         // 启动时扫描一次
         MusicLibrary.initAndScan();
     }
@@ -192,7 +200,7 @@ public class CraftMusicClient {
         }
     }
 
-    static void registerKeyMappings(RegisterKeyMappingsEvent event) {
+    private void registerKeyMappings(RegisterKeyMappingsEvent event) {
         OPEN_UI_KEY = new KeyMapping(
                 "key.craftmusic.open_ui",
                 InputConstants.Type.KEYSYM,
@@ -200,16 +208,6 @@ public class CraftMusicClient {
                 "key.categories.craftmusic"
         );
         event.register(OPEN_UI_KEY);
-    }
-
-    // 为 MOD 总线单独定义一个订阅容器，避免与公共总线混用
-    @EventBusSubscriber(modid = CraftMusic.MODID, value = Dist.CLIENT)
-    public static final class ModBusHandlers {
-        @SubscribeEvent
-        public static void onClientSetupModBus(FMLClientSetupEvent event) { CraftMusicClient.onClientSetup(event); }
-
-        @SubscribeEvent
-        public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) { CraftMusicClient.registerKeyMappings(event); }
     }
 
     @SubscribeEvent
@@ -220,6 +218,17 @@ public class CraftMusicClient {
         }
         // 后台自动切歌 / 模式逻辑
         PlaybackController.update(PLAYER);
+        // 音量守护：确保实际输出音量与配置一致（防止原生层在播放开始时恢复为 100%）
+        try {
+            if (PLAYER != null && PLAYER.isOutputReady()) {
+                float cfg = com.tqk114514.craftmusic.client.ClientConfig.getVolume();
+                float cur = PLAYER.getVolume();
+                if (Math.abs(cur - cfg) > 0.02f || Math.abs(lastAppliedVolume - cfg) > 0.001f) {
+                    PLAYER.setVolume(cfg);
+                    lastAppliedVolume = cfg;
+                }
+            }
+        } catch (Throwable ignored) {}
     }
 
     @SubscribeEvent
@@ -236,9 +245,11 @@ public class CraftMusicClient {
 
     @SubscribeEvent
     static void onScreenRender(ScreenEvent.Render.Post event) {
-        // Screen 场景：仅当配置为 GLOBAL 时渲染（WORLD 模式下只在 HUD）
+        // Screen 场景：仅当配置为 GLOBAL 时渲染（WORLD 模式下只在 HUD）。
+        // 若当前为位置设置界面，跳过全局渲染，避免与该界面自身预览重复。
         String scope = ClientConfig.getFloatingLyricsRender();
         if ("GLOBAL".equals(scope)) {
+            if (event.getScreen() instanceof FloatingLyricsPositionScreen) return;
             renderFloatingLyrics(event.getGuiGraphics());
         }
     }
@@ -275,22 +286,48 @@ public class CraftMusicClient {
         String text = lines.get(idx).text;
         if (text == null || text.isBlank()) return;
         var mc = Minecraft.getInstance();
-        var font = mc.font;
-        // 计算位置
-        String pos = ClientConfig.getFloatingLyricsPosition();
-        int x, y;
-        int margin = 4;
-        int textW = font.width(text);
+        
+        // 字号缩放与对齐（左右吸附影响对齐方式）
+        float scale = ClientConfig.getFloatingLyricsFontScale();
+        int color = ClientConfig.getFloatingLyricsColor();
+        boolean outline = ClientConfig.isFloatingLyricsOutline();
         int screenW = mc.getWindow().getGuiScaledWidth();
         int screenH = mc.getWindow().getGuiScaledHeight();
-        switch (pos) {
-            case "BOTTOM_LEFT" -> { x = margin; y = screenH - margin - font.lineHeight; }
-            case "TOP_RIGHT" -> { x = screenW - margin - textW; y = margin; }
-            case "BOTTOM_RIGHT" -> { x = screenW - margin - textW; y = screenH - margin - font.lineHeight; }
-            default -> { x = margin; y = margin; }
+        int anchorX = Math.round(ClientConfig.getFloatingLyricsPosX() * screenW);
+        int anchorY = Math.round(ClientConfig.getFloatingLyricsPosY() * screenH);
+        
+        // 使用默认字体
+        {
+            var font = Minecraft.getInstance().font;
+            int textW = Math.round(font.width(text) * scale);
+            int textH = Math.round(font.lineHeight * scale);
+            int snap = 12;
+            boolean nearLeft = Math.abs(anchorX - 0) < snap;
+            boolean nearRight = Math.abs(anchorX - screenW) < snap;
+            int drawX = anchorX - (nearLeft ? 0 : (nearRight ? textW : textW / 2));
+            int drawY = Math.max(0, Math.min(anchorY, screenH - textH));
+            
+            var pose = gfx.pose();
+            pose.pushPose();
+            pose.translate(drawX, drawY, 0);
+            pose.scale(scale, scale, 1);
+            
+            int a = (color >>> 24) & 0xFF;
+            if (a <= 0) { 
+                pose.popPose(); 
+                return; 
+            }
+            
+            if (outline) {
+                int outlineColor = (a << 24);
+                gfx.drawString(font, text, 1, 0, outlineColor, false);
+                gfx.drawString(font, text, -1, 0, outlineColor, false);
+                gfx.drawString(font, text, 0, 1, outlineColor, false);
+                gfx.drawString(font, text, 0, -1, outlineColor, false);
+            }
+            gfx.drawString(font, text, 0, 0, color, false);
+            pose.popPose();
         }
-        // 绘制：右侧位置通过预先计算 x 实现右对齐
-        gfx.drawString(font, text, x, y, 0xFFFFFFFF, true);
     }
 
     private static int findCurrentLineIndex(java.util.List<Lyrics.Line> lines, int curMs) {
@@ -302,5 +339,42 @@ public class CraftMusicClient {
             if (t <= curMs) { ans = mid; lo = mid + 1; } else { hi = mid - 1; }
         }
         return ans;
+    }
+
+    // 提供当前位置的浮动歌词文本，供位置设置界面预览/拖拽
+    public static String getCurrentFloatingLyricText() {
+        try {
+            if (PLAYER == null || !PLAYER.isOutputReady()) return null;
+            String path = PLAYER.getLastPlayedAbsolutePath();
+            if (path == null || path.isBlank()) return null;
+            if (overlayLyricsForPath == null || !overlayLyricsForPath.equalsIgnoreCase(path)) {
+                Lyrics lyr = Lyrics.empty();
+                try {
+                    var infos = MusicLibrary.getTrackInfos();
+                    if (infos != null) {
+                        for (var info : infos) {
+                            if (info != null && info.getAudioPath() != null &&
+                                    info.getAudioPath().toAbsolutePath().toString().equalsIgnoreCase(path)) {
+                                var lrc = info.getLyricsPath();
+                                if (lrc != null) lyr = LrcParser.parse(lrc);
+                                break;
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {}
+                overlayLyrics = lyr;
+                overlayLyricsForPath = path;
+            }
+            if (overlayLyrics == null) return null;
+            var lines = overlayLyrics.getLines();
+            if (lines == null || lines.isEmpty()) return null;
+            int curMs = (PLAYER != null) ? PLAYER.getPositionMs() : 0;
+            int idx = findCurrentLineIndex(lines, curMs);
+            if (idx < 0 || idx >= lines.size()) return null;
+            String text = lines.get(idx).text;
+            return (text == null || text.isBlank()) ? null : text;
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 }
