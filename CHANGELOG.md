@@ -18,7 +18,7 @@
   Linear gain made the lower half of the slider nearly useless — 50% still sounded about
   70% as loud. Stored config values and the UI still show the slider position; only the
   gain handed to the audio backend is mapped.
-- Requires **NeoForge 21.1.250** or newer for Minecraft 1.21.1.
+- Requires **NeoForge 21.1.200** or newer for Minecraft 1.21.1.
 
 ### Internal
 - Removed the dead `NullSafetyUtils` wrapper (it null-checked APIs that never return null).
