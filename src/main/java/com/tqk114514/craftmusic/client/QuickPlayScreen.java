@@ -3,6 +3,7 @@ package com.tqk114514.craftmusic.client;
 import com.tqk114514.craftmusic.CraftMusic;
 import com.tqk114514.craftmusic.audio.MiniaudioPlayer;
 import com.tqk114514.craftmusic.client.settings.SettingsScreen;
+import com.tqk114514.craftmusic.client.widget.SeekBarView;
 import com.tqk114514.craftmusic.client.widget.SpectrumView;
 
 import net.minecraft.client.Minecraft;
@@ -36,12 +37,7 @@ public class QuickPlayScreen extends Screen {
     private long lastClickMs = 0L;
     private Path lastClickedPath = null;
     private static final int DOUBLE_CLICK_MS = 350;
-    private int seekBarX = 2;  // 与其他元素对齐
-    private int seekBarY;
-    private int seekBarW;
-    private int seekBarH = 6;
-    private boolean dragging = false;
-    private int pendingSeekMs = -1;
+    private final SeekBarView seekBar = new SeekBarView();
     // 保留字段移除，逻辑由后台控制器处理
     // 音量条
     private int volBarX;
@@ -206,8 +202,7 @@ public class QuickPlayScreen extends Screen {
         updateModeButtonLabel();
 
         // 进度条区域
-        seekBarY = bottomY - 12;
-        seekBarW = this.width - 2 - 10; // 左边2px，右边10px边距
+        seekBar.layout(this.width, bottomY - 12);
 
         // 初始选择第一项（若有）
         if (!filteredTracks.isEmpty()) {
@@ -257,12 +252,12 @@ public class QuickPlayScreen extends Screen {
         if (currentPath != null && (isPlaying || (player != null && player.isPaused()))) {
             String name = currentPath.getFileName().toString();
             int textX = 2;  // 与其他元素对齐
-            int textY = seekBarY - 12; // 显示在进度条上方，避免与底部按钮冲突
+            int textY = seekBar.getY() - 12; // 显示在进度条上方，避免与底部按钮冲突
             gfx.text(this.font, Component.literal(name), textX, textY, 0xFFFFFFFF, false);
         }
 
         // 绘制进度条
-        drawSeekBar(gfx, mouseX);
+        seekBar.extract(gfx, this.font, player);
         drawVolumeBar(gfx, mouseX);
         // 同步显示与索引（全局控制器可能已切歌）
         syncFromPlayer();
@@ -478,35 +473,12 @@ public class QuickPlayScreen extends Screen {
     }
 
     // ---- 进度条绘制与交互 ----
-    private void drawSeekBar(net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX) {
-        int x0 = seekBarX;
-        int x1 = seekBarX + seekBarW;
-        int y = seekBarY;
-        // 背景条
-        gfx.fill(x0, y, x1, y + seekBarH, 0x80000000);
-        // 进度
-        int len = (player != null) ? player.getLengthMs() : 0;
-        int pos = (player != null) ? player.getPositionMs() : 0;
-        // 拖动中仅显示装饰性位置，不改变真实播放位置
-        if (dragging && pendingSeekMs >= 0) pos = pendingSeekMs;
-        float pct = (len > 0) ? Math.min(1f, Math.max(0f, pos / (float)len)) : 0f;
-        int knobX = x0 + Math.round(pct * seekBarW);
-        gfx.fill(x0, y, knobX, y + seekBarH, 0xFF00AAFF);
-        // 拖动手柄
-        gfx.fill(knobX - 2, y - 2, knobX + 2, y + seekBarH + 2, 0xFFFFFFFF);
-
-        // 时间文本（当前/总时长）
-        String timeStr = formatTime(pos) + " / " + formatTime(len);
-        gfx.text(this.font, timeStr, x1 - Math.max(60, this.font.width(timeStr)), y - 10, 0xFFFFFFFF, false);
-    }
-
     @Override
     public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
         double mouseX = event.x(); double mouseY = event.y(); int button = event.button();
         if (button == 0) {
-            if (mouseY >= seekBarY - 4 && mouseY <= seekBarY + seekBarH + 4 && mouseX >= seekBarX && mouseX <= seekBarX + seekBarW) {
-                dragging = true;
-                updatePendingSeek((int)mouseX);
+            if (seekBar.containsPoint(mouseX, mouseY)) {
+                seekBar.beginDrag((int)mouseX, (player != null) ? player.getLengthMs() : 0);
                 return true;
             }
             if (mouseY >= volBarY - 4 && mouseY <= volBarY + volBarH + 4 && mouseX >= volBarX && mouseX <= volBarX + volBarW) {
@@ -521,8 +493,8 @@ public class QuickPlayScreen extends Screen {
     @Override
     public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double dx, double dy) {
         double mouseX = event.x(); double mouseY = event.y(); int button = event.button();
-        if (dragging && button == 0) {
-            updatePendingSeek((int)mouseX);
+        if (seekBar.isDragging() && button == 0) {
+            seekBar.updateDrag((int)mouseX, (player != null) ? player.getLengthMs() : 0);
             return true;
         }
         if (draggingVol && button == 0) {
@@ -535,10 +507,10 @@ public class QuickPlayScreen extends Screen {
         @Override
     public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
         double mouseX = event.x(); double mouseY = event.y(); int button = event.button();
-        if (dragging && button == 0) {
-            dragging = false;
-            if (player != null && player.isOutputReady() && pendingSeekMs >= 0) {
-                player.seekToMs(pendingSeekMs);
+        if (seekBar.isDragging() && button == 0) {
+            int targetMs = seekBar.endDrag();
+            if (player != null && player.isOutputReady() && targetMs >= 0) {
+                player.seekToMs(targetMs);
                 // 若处于暂停，则释放后立即恢复播放
                 if (player.isPaused()) {
                     player.resume();
@@ -548,7 +520,6 @@ public class QuickPlayScreen extends Screen {
                 // 同步 UI 状态
                 syncFromPlayer();
             }
-            pendingSeekMs = -1;
             return true;
         }
         if (draggingVol && button == 0) {
@@ -556,15 +527,6 @@ public class QuickPlayScreen extends Screen {
             return true;
         }
         return super.mouseReleased(event);
-    }
-
-    private void updatePendingSeek(int mouseX) {
-        if (player == null || !player.isOutputReady()) return;
-        int x0 = seekBarX;
-        int rel = Math.max(0, Math.min(seekBarW, mouseX - x0));
-        int len = player.getLengthMs();
-        int target = (len > 0) ? (int)((rel / (float)seekBarW) * len) : 0;
-        pendingSeekMs = target;
     }
 
     private void drawVolumeBar(net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX) {
