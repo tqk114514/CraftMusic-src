@@ -1,7 +1,7 @@
 package com.tqk114514.craftmusic.client.settings.lyrics;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -45,10 +45,10 @@ public class FloatingLyricsPositionScreen extends Screen {
     }
 
     @Override
-    public void render(@Nonnull GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(gfx, mouseX, mouseY, partialTick);
+    public void extractRenderState(@Nonnull GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+        this.extractBackground(gfx, mouseX, mouseY, partialTick);
         // 先绘制UI，最后绘制预览与边框，避免被后续模糊影响
-        super.render(gfx, mouseX, mouseY, partialTick);
+        super.extractRenderState(gfx, mouseX, mouseY, partialTick);
         float scale = ClientConfig.getFloatingLyricsFontScale();
         boolean outline = ClientConfig.isFloatingLyricsOutline();
         int color = ClientConfig.getFloatingLyricsColor();
@@ -90,20 +90,20 @@ public class FloatingLyricsPositionScreen extends Screen {
         // 位置设置界面总是渲染预览文本；全局渲染器已在该界面下被显式跳过，避免重复
         if (true) {
             var pose = gfx.pose();
-            pose.pushPose();
-            pose.translate(drawX, drawY, 0);
-            pose.scale(scale, scale, 1);
+            pose.pushMatrix();
+            pose.translate(drawX, drawY);
+            pose.scale(scale, scale);
             int a = (color >>> 24) & 0xFF;
-            if (a <= 0) { pose.popPose(); return; }
+            if (a <= 0) { pose.popMatrix(); return; }
             if (outline) {
                 int outlineColor = (a << 24);
-                gfx.drawString(lyricsFont, text, 1, 0, outlineColor, false);
-                gfx.drawString(lyricsFont, text, -1, 0, outlineColor, false);
-                gfx.drawString(lyricsFont, text, 0, 1, outlineColor, false);
-                gfx.drawString(lyricsFont, text, 0, -1, outlineColor, false);
+                gfx.text(lyricsFont, text, 1, 0, outlineColor, false);
+                gfx.text(lyricsFont, text, -1, 0, outlineColor, false);
+                gfx.text(lyricsFont, text, 0, 1, outlineColor, false);
+                gfx.text(lyricsFont, text, 0, -1, outlineColor, false);
             }
-            gfx.drawString(lyricsFont, text, 0, 0, color, false);
-            pose.popPose();
+            gfx.text(lyricsFont, text, 0, 0, color, false);
+            pose.popMatrix();
         }
         // 可点区域描边（置于最上层）
         gfx.fill(drawX - 1, drawY - 1, drawX + textW + 1, drawY, 0x40FFFFFF);
@@ -114,9 +114,10 @@ public class FloatingLyricsPositionScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x(); double mouseY = event.y(); int button = event.button();
         // 先让子组件（按钮）处理点击；若未处理，再进入拖拽
-        if (super.mouseClicked(mouseX, mouseY, button)) return true;
+        if (super.mouseClicked(event, doubleClick)) return true;
         if (button == 0) {
             float scale = ClientConfig.getFloatingLyricsFontScale();
             String text = com.tqk114514.craftmusic.CraftMusicClient.getCurrentFloatingLyricText();
@@ -153,7 +154,8 @@ public class FloatingLyricsPositionScreen extends Screen {
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
+    public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double dx, double dy) {
+        double mouseX = event.x(); double mouseY = event.y(); int button = event.button();
         if (dragging && button == 0) {
             int x = (int)mouseX - dragOffsetX;
             int y = (int)mouseY - dragOffsetY;
@@ -199,11 +201,12 @@ public class FloatingLyricsPositionScreen extends Screen {
             positionDirty = true;
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dx, dy);
+        return super.mouseDragged(event, dx, dy);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
+        double mouseX = event.x(); double mouseY = event.y(); int button = event.button();
         if (dragging && button == 0) {
             dragging = false;
             if (positionDirty) {
@@ -212,7 +215,7 @@ public class FloatingLyricsPositionScreen extends Screen {
             }
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleased(event);
     }
 
     private static float clamp(float v) { return Math.max(0f, Math.min(1f, v)); }

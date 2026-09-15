@@ -1,13 +1,13 @@
 package com.tqk114514.craftmusic.client.settings.feedback;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 
 import javax.annotation.Nonnull;
 import java.util.List;
@@ -52,15 +52,15 @@ public class FeedbackInfoScreen extends Screen {
     }
 
     @Override
-    public void render(@Nonnull GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(gfx, mouseX, mouseY, partialTick);
-        super.render(gfx, mouseX, mouseY, partialTick);
+    public void extractRenderState(@Nonnull GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+        this.extractBackground(gfx, mouseX, mouseY, partialTick);
+        super.extractRenderState(gfx, mouseX, mouseY, partialTick);
         // 面包屑：设置 > 反馈 > （提交BUG/提交建议）
         String breadcrumb = Component.translatable("craftmusic.ui.settings").getString()
                 + " > " + Component.translatable("craftmusic.ui.feedback.menu").getString()
                 + " > " + Component.translatable(tailKey).getString();
         int titleX = (this.width - this.font.width(breadcrumb)) / 2;
-        gfx.drawString(this.font, breadcrumb, titleX, 8, 0xFFFFFF, false);
+        gfx.text(this.font, breadcrumb, titleX, 8, 0xFFFFFF, false);
 
         // 正文：居中面板+居中对齐
         int panelPad = 10;
@@ -78,7 +78,7 @@ public class FeedbackInfoScreen extends Screen {
         for (FormattedCharSequence seq : lines) {
             int lineW = this.font.width(seq);
             int x = contentLeft + (contentWidth - lineW) / 2;
-            gfx.drawString(this.font, seq, x, y, 0xDDDDDD, false);
+            gfx.text(this.font, seq, x, y, 0xDDDDDD, false);
             y += this.font.lineHeight + 2;
         }
     }

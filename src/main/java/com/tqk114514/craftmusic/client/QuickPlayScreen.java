@@ -246,19 +246,19 @@ public class QuickPlayScreen extends Screen {
     }
 
     @Override
-    public void render(@Nonnull net.minecraft.client.gui.GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(gfx, mouseX, mouseY, partialTick);
+    public void extractRenderState(@Nonnull net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+        this.extractBackground(gfx, mouseX, mouseY, partialTick);
         // 频谱作为“背景”先绘制，避免覆盖按钮/列表等UI
         if (ClientConfig.isSpectrumEnabled() && player != null && player.isOutputReady()) {
             drawSpectrumBar(gfx);
         }
-        super.render(gfx, mouseX, mouseY, partialTick);
-        gfx.drawString(this.font, Component.translatable("craftmusic.ui.title"), 2, 10 - 9, 0xFFFFFF, false);
+        super.extractRenderState(gfx, mouseX, mouseY, partialTick);
+        gfx.text(this.font, Component.translatable("craftmusic.ui.title"), 2, 10 - 9, 0xFFFFFF, false);
         if (currentPath != null && (isPlaying || (player != null && player.isPaused()))) {
             String name = currentPath.getFileName().toString();
             int textX = 2;  // 与其他元素对齐
             int textY = seekBarY - 12; // 显示在进度条上方，避免与底部按钮冲突
-            gfx.drawString(this.font, Component.literal(name), textX, textY, 0xFFFFFF, false);
+            gfx.text(this.font, Component.literal(name), textX, textY, 0xFFFFFF, false);
         }
 
         // 绘制进度条
@@ -272,7 +272,7 @@ public class QuickPlayScreen extends Screen {
 
     private final float[] spectrumBuf = new float[64];
     private long lastSpectrumFetchMs = 0L;
-    private void drawSpectrumBar(net.minecraft.client.gui.GuiGraphics gfx) {
+    private void drawSpectrumBar(net.minecraft.client.gui.GuiGraphicsExtractor gfx) {
         int bands = 64;
         long now = System.currentTimeMillis();
         if (now - lastSpectrumFetchMs >= 33) { // ~30FPS
@@ -315,7 +315,7 @@ public class QuickPlayScreen extends Screen {
         }
 
         @Override
-        protected int getScrollbarPosition() {
+        protected int scrollBarX() {
             return this.left + this.listWidth - 6;
         }
 
@@ -331,7 +331,7 @@ public class QuickPlayScreen extends Screen {
                 addEntry(new TrackEntry(this, p, i++));
             }
             if (selectedIndex >= 0 && selectedIndex < getItemCount()) {
-                setSelected(getEntry(selectedIndex));
+                setSelected(children().get(selectedIndex));
             }
             QuickPlayScreen.this.updateControlsEnabled();
         }
@@ -343,7 +343,7 @@ public class QuickPlayScreen extends Screen {
                 addEntry(new TrackEntry(this, info.getAudioPath(), i++, info.hasLyrics()));
             }
             if (selectedIndex >= 0 && selectedIndex < getItemCount()) {
-                setSelected(getEntry(selectedIndex));
+                setSelected(children().get(selectedIndex));
             }
             QuickPlayScreen.this.updateControlsEnabled();
         }
@@ -356,14 +356,14 @@ public class QuickPlayScreen extends Screen {
             }
             if (!infos.isEmpty()) {
                 selectedIndex = 0;
-                setSelected(getEntry(0));
+                setSelected(children().get(0));
             }
             QuickPlayScreen.this.updateControlsEnabled();
         }
 
         void selectIndex(int index) {
             if (index >= 0 && index < getItemCount()) {
-                setSelected(getEntry(index));
+                setSelected(children().get(index));
             }
             QuickPlayScreen.this.updateControlsEnabled();
         }
@@ -390,18 +390,19 @@ public class QuickPlayScreen extends Screen {
         }
 
         @Override
-        public void render(@Nonnull net.minecraft.client.gui.GuiGraphics gfx, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float partialTick) {
+        public void extractContent(net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX, int mouseY, boolean hovered, float partialTick) {
             String name = path.getFileName().toString();
             String suffix = hasLyrics ? Component.translatable("craftmusic.ui.has_lyrics").getString() : Component.translatable("craftmusic.ui.no_lyrics").getString();
             int fh = QuickPlayScreen.this.font.lineHeight;
-            int textY = y + Math.max(0, (entryHeight - fh) / 2);
-            // 使用传入的x参数作为基准，这是列表项的实际渲染位置
-            int textX = x + 6; // 使用传入的x坐标，加6px内边距
-            gfx.drawString(QuickPlayScreen.this.font, name + "  [" + suffix + "]", textX, textY, 0xFFFFFF, false);
+            // 26.1 起条目位置不再作为参数传入，改由 LayoutElement 的几何信息取
+            int textY = getY() + Math.max(0, (getHeight() - fh) / 2);
+            int textX = getX() + 6;
+            gfx.text(QuickPlayScreen.this.font, name + "  [" + suffix + "]", textX, textY, 0xFFFFFF, false);
         }
 
         @Override
-        public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x(); double mouseY = event.y(); int button = event.button();
             if (button != 0) return false;
             // 选择该项
             parent.setSelected(this);
@@ -504,7 +505,7 @@ public class QuickPlayScreen extends Screen {
     }
 
     // ---- 进度条绘制与交互 ----
-    private void drawSeekBar(net.minecraft.client.gui.GuiGraphics gfx, int mouseX) {
+    private void drawSeekBar(net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX) {
         int x0 = seekBarX;
         int x1 = seekBarX + seekBarW;
         int y = seekBarY;
@@ -523,11 +524,12 @@ public class QuickPlayScreen extends Screen {
 
         // 时间文本（当前/总时长）
         String timeStr = formatTime(pos) + " / " + formatTime(len);
-        gfx.drawString(this.font, timeStr, x1 - Math.max(60, this.font.width(timeStr)), y - 10, 0xFFFFFFFF, false);
+        gfx.text(this.font, timeStr, x1 - Math.max(60, this.font.width(timeStr)), y - 10, 0xFFFFFFFF, false);
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x(); double mouseY = event.y(); int button = event.button();
         if (button == 0) {
             if (mouseY >= seekBarY - 4 && mouseY <= seekBarY + seekBarH + 4 && mouseX >= seekBarX && mouseX <= seekBarX + seekBarW) {
                 dragging = true;
@@ -540,11 +542,12 @@ public class QuickPlayScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
+    public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double dx, double dy) {
+        double mouseX = event.x(); double mouseY = event.y(); int button = event.button();
         if (dragging && button == 0) {
             updatePendingSeek((int)mouseX);
             return true;
@@ -553,11 +556,12 @@ public class QuickPlayScreen extends Screen {
             updateVolumeFromMouse((int)mouseX);
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dx, dy);
+        return super.mouseDragged(event, dx, dy);
         }
 
         @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
+        double mouseX = event.x(); double mouseY = event.y(); int button = event.button();
         if (dragging && button == 0) {
             dragging = false;
             if (player != null && player.isOutputReady() && pendingSeekMs >= 0) {
@@ -578,7 +582,7 @@ public class QuickPlayScreen extends Screen {
             draggingVol = false;
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleased(event);
     }
 
     private void updatePendingSeek(int mouseX) {
@@ -590,7 +594,7 @@ public class QuickPlayScreen extends Screen {
         pendingSeekMs = target;
     }
 
-    private void drawVolumeBar(net.minecraft.client.gui.GuiGraphics gfx, int mouseX) {
+    private void drawVolumeBar(net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX) {
         int x0 = volBarX;
         int x1 = volBarX + volBarW;
         int y = volBarY;
@@ -603,8 +607,8 @@ public class QuickPlayScreen extends Screen {
         String label = Component.translatable("craftmusic.ui.volume").getString();
         String percent = (int)Math.round(vol * 100) + "%";
         int textY = y - 9;
-        gfx.drawString(this.font, label, x0, textY, 0xFFFFFFFF, false);
-        gfx.drawString(this.font, percent, x1 - this.font.width(percent), textY, 0xFFFFFFFF, false);
+        gfx.text(this.font, label, x0, textY, 0xFFFFFFFF, false);
+        gfx.text(this.font, percent, x1 - this.font.width(percent), textY, 0xFFFFFFFF, false);
     }
 
     private void updateVolumeFromMouse(int mouseX) {
@@ -638,7 +642,7 @@ public class QuickPlayScreen extends Screen {
         lyricsLoadedForPath = cur;
     }
 
-    private void drawLyricsPanel(net.minecraft.client.gui.GuiGraphics gfx) {
+    private void drawLyricsPanel(net.minecraft.client.gui.GuiGraphicsExtractor gfx) {
         // 左右分栏：左列表贴左边，右边保留10px边距
         int gap = 10;
         int rightPadding = 10;
@@ -665,7 +669,7 @@ public class QuickPlayScreen extends Screen {
             } else {
                 noLyricsActive = false;
                 int tx = midX - this.font.width(txt) / 2;
-                gfx.drawString(this.font, txt, tx, centerY, 0xFFFFFFFF, false);
+                gfx.text(this.font, txt, tx, centerY, 0xFFFFFFFF, false);
             }
             return;
         } else {
@@ -730,7 +734,7 @@ public class QuickPlayScreen extends Screen {
             int tx = midX - this.font.width(text) / 2;
             int color = (i == curIdx) ? 0xFFFFFFFF : 0xFFAAAAAA;
             if (!ClientConfig.isLyricEffects()) {
-                gfx.drawString(this.font, text, tx, y, color, false);
+                gfx.text(this.font, text, tx, y, color, false);
             } else {
                 float t = Math.max(0f, Math.min(1f, (now - scaleAnimStartMs) / (float)SCALE_ANIM_MS));
                 // easeInOutCubic
@@ -748,22 +752,22 @@ public class QuickPlayScreen extends Screen {
         }
     }
 
-    private void drawCenteredScaledString(net.minecraft.client.gui.GuiGraphics gfx, String text, int midX, int y, float scale, int argb) {
+    private void drawCenteredScaledString(net.minecraft.client.gui.GuiGraphicsExtractor gfx, String text, int midX, int y, float scale, int argb) {
         if (scale <= 0f) return;
         if (Math.abs(scale - 1f) < 0.001f) {
             int tx = midX - this.font.width(text) / 2;
-            gfx.drawString(this.font, text, tx, y, argb, false);
+            gfx.text(this.font, text, tx, y, argb, false);
             return;
         }
         var pose = gfx.pose();
-        pose.pushPose();
+        pose.pushMatrix();
         float textW = this.font.width(text);
         float scaledW = textW * scale;
         float tx = midX - scaledW / 2f;
-        pose.translate(tx, y, 0);
-        pose.scale(scale, scale, 1f);
-        gfx.drawString(this.font, text, 0, 0, argb, false);
-        pose.popPose();
+        pose.translate(tx, y);
+        pose.scale(scale, scale);
+        gfx.text(this.font, text, 0, 0, argb, false);
+        pose.popMatrix();
     }
     
     private void filterTracks(String searchText) {

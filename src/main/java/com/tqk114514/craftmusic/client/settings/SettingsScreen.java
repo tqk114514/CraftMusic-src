@@ -1,7 +1,7 @@
 package com.tqk114514.craftmusic.client.settings;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -53,12 +53,12 @@ public class SettingsScreen extends Screen {
     }
 
     @Override
-    public void render(@Nonnull GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(gfx, mouseX, mouseY, partialTick);
-        super.render(gfx, mouseX, mouseY, partialTick);
+    public void extractRenderState(@Nonnull GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+        this.extractBackground(gfx, mouseX, mouseY, partialTick);
+        super.extractRenderState(gfx, mouseX, mouseY, partialTick);
         String breadcrumb = Component.translatable("craftmusic.ui.settings").getString();
         int x = (this.width - this.font.width(breadcrumb)) / 2;
-        gfx.drawString(this.font, breadcrumb, x, 8, 0xFFFFFF, false);
+        gfx.text(this.font, breadcrumb, x, 8, 0xFFFFFF, false);
     }
 }
 

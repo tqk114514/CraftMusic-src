@@ -95,32 +95,32 @@ public class FloatingLyricsSettingsScreen extends Screen {
             // 保存交由外部持有者在 onRelease 或下一帧调用，这里直接不做
         }
         @Override
-        public void onRelease(double mouseX, double mouseY) {
+        public void onRelease(net.minecraft.client.input.MouseButtonEvent event) {
             // 交由父类处理，随后由外层读取值保存
-            super.onRelease(mouseX, mouseY);
+            super.onRelease(event);
             if (Minecraft.getInstance().screen instanceof FloatingLyricsColorScreen s) { s.saveColorFromSliders(); }
         }
         @Override
-        public void onClick(double mouseX, double mouseY) {
-            super.onClick(mouseX, mouseY);
+        public void onClick(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+            super.onClick(event, doubleClick);
             if (Minecraft.getInstance().screen instanceof FloatingLyricsColorScreen s) { s.saveColorFromSliders(); }
         }
         @Override
-        public void onDrag(double mouseX, double mouseY, double dx, double dy) {
-            super.onDrag(mouseX, mouseY, dx, dy);
+        public void onDrag(net.minecraft.client.input.MouseButtonEvent event, double dx, double dy) {
+            super.onDrag(event, dx, dy);
             if (Minecraft.getInstance().screen instanceof FloatingLyricsColorScreen s) { s.saveColorFromSliders(); }
         }
     }
 
     @Override
-    public void render(@Nonnull net.minecraft.client.gui.GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(gfx, mouseX, mouseY, partialTick);
-        super.render(gfx, mouseX, mouseY, partialTick);
+    public void extractRenderState(@Nonnull net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+        this.extractBackground(gfx, mouseX, mouseY, partialTick);
+        super.extractRenderState(gfx, mouseX, mouseY, partialTick);
         String breadcrumb = Component.translatable("craftmusic.ui.settings").getString()
                 + " > " + Component.translatable("craftmusic.ui.lyrics.settings").getString()
                 + " > " + Component.translatable("craftmusic.ui.floating_lyrics.settings").getString();
         int x = (this.width - this.font.width(breadcrumb)) / 2;
-        gfx.drawString(this.font, breadcrumb, x, 8, 0xFFFFFF, false);
+        gfx.text(this.font, breadcrumb, x, 8, 0xFFFFFF, false);
     }
 }
 

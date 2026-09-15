@@ -14,7 +14,7 @@ import net.minecraft.client.Minecraft;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.commands.Commands;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.minecraft.client.gui.components.Button;
@@ -78,7 +78,7 @@ public class CraftMusicClient {
                                         CraftMusic.LOGGER.warn("Audio output not ready.");
                                         var mc0 = Minecraft.getInstance();
                                         if (mc0.player != null) {
-                                            mc0.player.displayClientMessage(net.minecraft.network.chat.Component.translatable("craftmusic.error.output_not_ready"), false);
+                                            mc0.player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("craftmusic.error.output_not_ready"));
                                         }
                                         return 0;
                                     }
@@ -90,14 +90,14 @@ public class CraftMusicClient {
                                         var player = mc.player;
                                         if (player != null) {
                                             var err = net.minecraft.network.chat.Component.translatable(errorKey(rc));
-                                            player.displayClientMessage(net.minecraft.network.chat.Component.translatable("craftmusic.play.failed", err, Integer.toString(rc)), false);
+                                            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("craftmusic.play.failed", err, Integer.toString(rc)));
                                         }
                                         return 0;
                                     }
                                     var mc = Minecraft.getInstance();
                                     var player = mc.player;
                                     if (player != null) {
-                                        player.displayClientMessage(net.minecraft.network.chat.Component.translatable("craftmusic.play.start", path), false);
+                                        player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("craftmusic.play.start", path));
                                     }
                                     return 1;
                                 })
@@ -108,9 +108,9 @@ public class CraftMusicClient {
                     var player = mc.player;
                     if (PLAYER != null && PLAYER.isOutputReady()) {
                         PLAYER.stop();
-                        if (player != null) player.displayClientMessage(net.minecraft.network.chat.Component.translatable("craftmusic.play.stop"), false);
+                        if (player != null) player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("craftmusic.play.stop"));
                     } else if (player != null) {
-                        player.displayClientMessage(net.minecraft.network.chat.Component.translatable("craftmusic.error.output_not_ready"), false);
+                        player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("craftmusic.error.output_not_ready"));
                     }
                     return 1;
                 })
@@ -128,7 +128,7 @@ public class CraftMusicClient {
                         var mc0 = Minecraft.getInstance();
                         var player0 = mc0.player;
                         if (player0 != null) {
-                            player0.displayClientMessage(net.minecraft.network.chat.Component.translatable("craftmusic.error.output_not_ready"), false);
+                            player0.sendSystemMessage(net.minecraft.network.chat.Component.translatable("craftmusic.error.output_not_ready"));
                         }
                         return 0;
                     }
@@ -192,7 +192,7 @@ public class CraftMusicClient {
                 } else {
                     var mc = Minecraft.getInstance();
                     if (mc.player != null) {
-                        mc.player.displayClientMessage(Component.translatable("craftmusic.error.output_not_ready"), false);
+                        mc.player.sendSystemMessage(Component.translatable("craftmusic.error.output_not_ready"));
                     }
                 }
             }).bounds(x, y, 100, 20).build();
@@ -206,7 +206,7 @@ public class CraftMusicClient {
                 "key.craftmusic.open_ui",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_M,
-                "key.categories.craftmusic"
+                KeyMapping.Category.MISC
         );
         event.register(OPEN_UI_KEY);
     }
@@ -255,7 +255,7 @@ public class CraftMusicClient {
         }
     }
 
-    private static void renderFloatingLyrics(GuiGraphics gfx) {
+    private static void renderFloatingLyrics(GuiGraphicsExtractor gfx) {
         if (!ClientConfig.isFloatingLyrics()) return;
         if (PLAYER == null || !PLAYER.isOutputReady()) return;
         String path = PLAYER.getLastPlayedAbsolutePath();
@@ -291,25 +291,25 @@ public class CraftMusicClient {
             int drawY = Math.max(0, Math.min(anchorY, screenH - textH));
             
             var pose = gfx.pose();
-            pose.pushPose();
-            pose.translate(drawX, drawY, 0);
-            pose.scale(scale, scale, 1);
+            pose.pushMatrix();
+            pose.translate(drawX, drawY);
+            pose.scale(scale, scale);
             
             int a = (color >>> 24) & 0xFF;
             if (a <= 0) { 
-                pose.popPose(); 
+                pose.popMatrix(); 
                 return; 
             }
             
             if (outline) {
                 int outlineColor = (a << 24);
-                gfx.drawString(font, text, 1, 0, outlineColor, false);
-                gfx.drawString(font, text, -1, 0, outlineColor, false);
-                gfx.drawString(font, text, 0, 1, outlineColor, false);
-                gfx.drawString(font, text, 0, -1, outlineColor, false);
+                gfx.text(font, text, 1, 0, outlineColor, false);
+                gfx.text(font, text, -1, 0, outlineColor, false);
+                gfx.text(font, text, 0, 1, outlineColor, false);
+                gfx.text(font, text, 0, -1, outlineColor, false);
             }
-            gfx.drawString(font, text, 0, 0, color, false);
-            pose.popPose();
+            gfx.text(font, text, 0, 0, color, false);
+            pose.popMatrix();
         }
     }
 

@@ -64,12 +64,12 @@ public class LyricsSettingsScreen extends Screen {
     }
 
     @Override
-    public void render(@Nonnull net.minecraft.client.gui.GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(gfx, mouseX, mouseY, partialTick);
-        super.render(gfx, mouseX, mouseY, partialTick);
+    public void extractRenderState(@Nonnull net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+        this.extractBackground(gfx, mouseX, mouseY, partialTick);
+        super.extractRenderState(gfx, mouseX, mouseY, partialTick);
         String breadcrumb = Component.translatable("craftmusic.ui.settings").getString()
                 + " > " + Component.translatable("craftmusic.ui.lyrics.settings").getString();
         int x = (this.width - this.font.width(breadcrumb)) / 2;
-        gfx.drawString(this.font, breadcrumb, x, 8, 0xFFFFFF, false);
+        gfx.text(this.font, breadcrumb, x, 8, 0xFFFFFF, false);
     }
 }
