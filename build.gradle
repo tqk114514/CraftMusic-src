@@ -1,7 +1,7 @@
 plugins {
     id 'java-library'
     id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.107'
+    id 'net.neoforged.moddev' version '2.0.141'
     id 'idea'
 }
 
@@ -20,7 +20,7 @@ base {
     archivesName = mod_id
 }
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
@@ -29,10 +29,8 @@ tasks.withType(JavaCompile).configureEach {
 neoForge {
     version = project.neo_version
 
-    parchment {
-        mappingsVersion = project.parchment_mappings_version
-        minecraftVersion = project.parchment_minecraft_version
-    }
+    // Minecraft 26.1 起官方已移除混淆，Mojang 的参数名可直接用，不再需要 Parchment。
+    // （保留 Parchment 只为额外 javadoc，这里选择移除以减少一个外部依赖）
 
 
     runs {
