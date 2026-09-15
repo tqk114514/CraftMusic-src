@@ -5,6 +5,7 @@ import com.tqk114514.craftmusic.audio.MiniaudioPlayer;
 import com.tqk114514.craftmusic.client.settings.SettingsScreen;
 import com.tqk114514.craftmusic.client.widget.SeekBarView;
 import com.tqk114514.craftmusic.client.widget.SpectrumView;
+import com.tqk114514.craftmusic.client.widget.VolumeBarView;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
@@ -40,11 +41,7 @@ public class QuickPlayScreen extends Screen {
     private final SeekBarView seekBar = new SeekBarView();
     // 保留字段移除，逻辑由后台控制器处理
     // 音量条
-    private int volBarX;
-    private int volBarY;
-    private int volBarW = 110;
-    private int volBarH = 6;
-    private boolean draggingVol = false;
+    private final VolumeBarView volumeBar = new VolumeBarView();
     // 播放模式改为由全局控制器管理
     // 固定显示歌词（按钮不再控制）
     private Lyrics currentLyrics = Lyrics.empty();
@@ -192,10 +189,8 @@ public class QuickPlayScreen extends Screen {
         xb += btnW + gapB;
 
         // 音量条占位与几何
-        volBarY = bottomY + 7;
-        volBarX = xb;
-        volBarW = Math.max(60, computedVolW);
-        xb += volBarW + gapB;
+        volumeBar.layout(xb, bottomY + 7, Math.max(60, computedVolW));
+        xb += volumeBar.getWidth() + gapB;
 
         modeBtn = addRenderableWidget(Button.builder(Component.literal("") , b -> cycleMode())
                 .bounds(xb, bottomY, modeW, 20).build());
@@ -258,7 +253,7 @@ public class QuickPlayScreen extends Screen {
 
         // 绘制进度条
         seekBar.extract(gfx, this.font, player);
-        drawVolumeBar(gfx, mouseX);
+        volumeBar.extract(gfx, this.font);
         // 同步显示与索引（全局控制器可能已切歌）
         syncFromPlayer();
         // 绘制右侧歌词
@@ -481,9 +476,8 @@ public class QuickPlayScreen extends Screen {
                 seekBar.beginDrag((int)mouseX, (player != null) ? player.getLengthMs() : 0);
                 return true;
             }
-            if (mouseY >= volBarY - 4 && mouseY <= volBarY + volBarH + 4 && mouseX >= volBarX && mouseX <= volBarX + volBarW) {
-                draggingVol = true;
-                updateVolumeFromMouse((int)mouseX);
+            if (volumeBar.containsPoint(mouseX, mouseY)) {
+                volumeBar.beginDrag((int)mouseX, player);
                 return true;
             }
         }
@@ -497,8 +491,8 @@ public class QuickPlayScreen extends Screen {
             seekBar.updateDrag((int)mouseX, (player != null) ? player.getLengthMs() : 0);
             return true;
         }
-        if (draggingVol && button == 0) {
-            updateVolumeFromMouse((int)mouseX);
+        if (volumeBar.isDragging() && button == 0) {
+            volumeBar.updateDrag((int)mouseX, player);
             return true;
         }
         return super.mouseDragged(event, dx, dy);
@@ -522,38 +516,11 @@ public class QuickPlayScreen extends Screen {
             }
             return true;
         }
-        if (draggingVol && button == 0) {
-            draggingVol = false;
+        if (volumeBar.isDragging() && button == 0) {
+            volumeBar.endDrag();
             return true;
         }
         return super.mouseReleased(event);
-    }
-
-    private void drawVolumeBar(net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX) {
-        int x0 = volBarX;
-        int x1 = volBarX + volBarW;
-        int y = volBarY;
-        gfx.fill(x0, y, x1, y + volBarH, 0x80000000);
-        float vol = ClientConfig.getVolume();
-        int filled = x0 + Math.round(vol * volBarW);
-        gfx.fill(x0, y, filled, y + volBarH, 0xFFFFB000);
-        gfx.fill(filled - 2, y - 2, filled + 2, y + volBarH + 2, 0xFFFFFFFF);
-        // 文本：左侧“音量”，右侧百分比
-        String label = Component.translatable("craftmusic.ui.volume").getString();
-        String percent = (int)Math.round(vol * 100) + "%";
-        int textY = y - 9;
-        gfx.text(this.font, label, x0, textY, 0xFFFFFFFF, false);
-        gfx.text(this.font, percent, x1 - this.font.width(percent), textY, 0xFFFFFFFF, false);
-    }
-
-    private void updateVolumeFromMouse(int mouseX) {
-        int x0 = volBarX;
-        int rel = Math.max(0, Math.min(volBarW, mouseX - x0));
-        float v = rel / (float) volBarW;
-        if (player != null && player.isOutputReady()) {
-            player.setVolume(v);
-        }
-        ClientConfig.setVolume(v);
     }
 
     private static String formatTime(int ms) {
