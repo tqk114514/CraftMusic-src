@@ -23,6 +23,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.client.KeyMapping;
 import com.mojang.blaze3d.platform.InputConstants;
 import org.lwjgl.glfw.GLFW;
+import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import com.tqk114514.craftmusic.client.PlaybackController;
@@ -42,6 +43,10 @@ public class CraftMusicClient {
     @SubscribeEvent
     static void onClientSetup(FMLClientSetupEvent event) {
         CraftMusic.LOGGER.info("CraftMusic client setup initialized");
+        // 注入平台相关目录：ClientConfig 与 MusicLibrary 本身不依赖 Minecraft / NeoForge，
+        // 由加载器层（这里）负责把游戏目录与配置目录交给它们。
+        com.tqk114514.craftmusic.client.ClientConfig.initialize(FMLPaths.CONFIGDIR.get());
+        MusicLibrary.initialize(Minecraft.getInstance().gameDirectory.toPath());
         // 先加载配置
         com.tqk114514.craftmusic.client.ClientConfig.initAndLoad();
         float cfgVol = com.tqk114514.craftmusic.client.ClientConfig.getVolume();

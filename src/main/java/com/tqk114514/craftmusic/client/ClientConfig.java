@@ -1,8 +1,6 @@
 package com.tqk114514.craftmusic.client;
 
 import com.tqk114514.craftmusic.CraftMusic;
-import net.minecraft.client.Minecraft;
-import net.neoforged.fml.loading.FMLPaths;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -11,6 +9,8 @@ import java.nio.file.Path;
 
 public final class ClientConfig {
     private static final String FILE_NAME = "craftmusic-client.json";
+    // 由加载器层注入，避免本类直接依赖 FMLPaths / Minecraft
+    private static volatile Path configDirectory;
     private static volatile boolean initialized = false;
     private static volatile float volume = 1.0f;
     private static volatile String mode = "REPEAT_ALL"; // SEQUENTIAL, REPEAT_ALL, SHUFFLE, REPEAT_ONE
@@ -132,17 +132,23 @@ public final class ClientConfig {
         }
     }
 
-    private static Path getConfigFile() {
-        try {
-            // 优先使用 NeoForge 提供的 CONFIGDIR，避免早期阶段 Minecraft 实例未就绪导致路径错误
-            Path cfgDir = FMLPaths.CONFIGDIR.get();
-            return cfgDir.resolve(FILE_NAME);
-        } catch (Throwable ignored) {
-            Minecraft mc = Minecraft.getInstance();
-            Path gameDir = (mc != null && mc.gameDirectory != null) ? mc.gameDirectory.toPath() : Path.of(".");
-            Path cfgDir = gameDir.resolve("config");
-            return cfgDir.resolve(FILE_NAME);
+    /**
+     * 注入配置文件所在目录（NeoForge 下为 FMLPaths.CONFIGDIR）。
+     * 必须在首次读写配置之前调用，这样本类就不必直接依赖 NeoForge / Minecraft。
+     */
+    public static void initialize(Path configDirectoryPath) {
+        if (configDirectoryPath == null) {
+            throw new IllegalArgumentException("configDirectory must not be null");
         }
+        configDirectory = configDirectoryPath;
+    }
+
+    private static Path getConfigFile() {
+        Path cfgDir = configDirectory;
+        if (cfgDir == null) {
+            throw new IllegalStateException("ClientConfig 尚未初始化：需先调用 initialize(configDirectory)");
+        }
+        return cfgDir.resolve(FILE_NAME);
     }
 
     private static Float parseVolume(String json) {

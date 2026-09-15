@@ -1,7 +1,6 @@
 package com.tqk114514.craftmusic.client;
 
 import com.tqk114514.craftmusic.CraftMusic;
-import net.minecraft.client.Minecraft;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -107,12 +106,23 @@ public final class MusicLibrary {
         return audioPath.toAbsolutePath().toString().toLowerCase(Locale.ROOT);
     }
 
-    public static Path getLibraryDir() {
-        if (libraryDir == null) {
-            Path gameDir = Minecraft.getInstance().gameDirectory.toPath();
-            libraryDir = gameDir.resolve(FOLDER_NAME);
+    /**
+     * 注入游戏目录。必须由加载器层（NeoForge 的客户端初始化）在调用任何其他方法前完成，
+     * 这样本类就不必直接依赖 Minecraft 客户端类，便于将来复用于其他加载器。
+     */
+    public static void initialize(Path gameDirectory) {
+        if (gameDirectory == null) {
+            throw new IllegalArgumentException("gameDirectory must not be null");
         }
-        return libraryDir;
+        libraryDir = gameDirectory.resolve(FOLDER_NAME);
+    }
+
+    public static Path getLibraryDir() {
+        Path dir = libraryDir;
+        if (dir == null) {
+            throw new IllegalStateException("MusicLibrary 尚未初始化：需先调用 initialize(gameDirectory)");
+        }
+        return dir;
     }
 
     private static boolean isSupported(Path p) {
