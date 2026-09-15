@@ -8,8 +8,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -20,6 +22,8 @@ public final class MusicLibrary {
     private static Path libraryDir;
     private static volatile List<Path> tracks = Collections.emptyList();
     private static volatile List<TrackInfo> trackInfos = Collections.emptyList();
+    // 绝对路径（小写）→ TrackInfo，避免每次按曲目查歌词都线性扫描整个库
+    private static volatile Map<String, TrackInfo> trackIndex = Collections.emptyMap();
 
     private MusicLibrary() {}
 
@@ -61,6 +65,11 @@ public final class MusicLibrary {
         }
         tracks = Collections.unmodifiableList(resultPaths);
         trackInfos = Collections.unmodifiableList(resultInfos);
+        Map<String, TrackInfo> idx = new HashMap<>();
+        for (TrackInfo info : resultInfos) {
+            idx.put(key(info.getAudioPath()), info);
+        }
+        trackIndex = Collections.unmodifiableMap(idx);
         CraftMusic.LOGGER.info("MusicLibrary scanned {} tracks in {}", tracks.size(), dir);
     }
 
@@ -70,6 +79,32 @@ public final class MusicLibrary {
 
     public static List<TrackInfo> getTrackInfos() {
         return trackInfos;
+    }
+
+    /**
+     * 按音频绝对路径查找曲目，找不到返回 null。查找与大小写无关。
+     */
+    public static TrackInfo findTrack(String absolutePath) {
+        if (absolutePath == null || absolutePath.isBlank()) return null;
+        try {
+            return trackIndex.get(key(Path.of(absolutePath)));
+        } catch (RuntimeException e) {
+            // 路径可能来自 /craftmusic play 的任意用户输入，非法路径不应当抛出去
+            return null;
+        }
+    }
+
+    /**
+     * 按音频绝对路径加载歌词；曲目不存在或无同名 lrc 时返回空歌词。
+     */
+    public static Lyrics loadLyrics(String absolutePath) {
+        TrackInfo info = findTrack(absolutePath);
+        if (info == null || info.getLyricsPath() == null) return Lyrics.empty();
+        return LrcParser.parse(info.getLyricsPath());
+    }
+
+    private static String key(Path audioPath) {
+        return audioPath.toAbsolutePath().toString().toLowerCase(Locale.ROOT);
     }
 
     public static Path getLibraryDir() {

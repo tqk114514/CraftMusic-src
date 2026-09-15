@@ -627,28 +627,15 @@ public class QuickPlayScreen extends Screen {
     // 自动切歌交由后台控制器处理
 
     private void loadLyricsForCurrent() {
-        try {
-            if (currentPath == null) {
-                currentLyrics = Lyrics.empty();
-                lyricsLoadedForPath = null;
-                return;
-            }
-            String cur = currentPath.toAbsolutePath().toString();
-            if (cur.equalsIgnoreCase(lyricsLoadedForPath)) return;
-            var infos = MusicLibrary.getTrackInfos();
-            Lyrics loaded = Lyrics.empty();
-            if (infos != null) {
-                for (MusicLibrary.TrackInfo info : infos) {
-                    if (info != null && info.getAudioPath() != null && info.getAudioPath().toAbsolutePath().toString().equalsIgnoreCase(cur)) {
-                        Path lrc = info.getLyricsPath();
-                        if (lrc != null) loaded = LrcParser.parse(lrc);
-                        break;
-                    }
-                }
-            }
-            currentLyrics = loaded;
-            lyricsLoadedForPath = cur;
-        } catch (Exception ignored) {}
+        if (currentPath == null) {
+            currentLyrics = Lyrics.empty();
+            lyricsLoadedForPath = null;
+            return;
+        }
+        String cur = currentPath.toAbsolutePath().toString();
+        if (cur.equalsIgnoreCase(lyricsLoadedForPath)) return;
+        currentLyrics = MusicLibrary.loadLyrics(cur);
+        lyricsLoadedForPath = cur;
     }
 
     private void drawLyricsPanel(net.minecraft.client.gui.GuiGraphics gfx) {
@@ -685,7 +672,7 @@ public class QuickPlayScreen extends Screen {
             noLyricsActive = false;
         }
         int curMs = (player != null) ? player.getPositionMs() : 0;
-        int curIdx = findCurrentLineIndex(lines, curMs);
+        int curIdx = Lyrics.findLineIndexAt(lines, curMs);
         long now = System.currentTimeMillis();
         if (!ClientConfig.isLyricEffects()) {
             lyricScrollPos = (curIdx < 0) ? 0f : Math.min(curIdx, lines.size() - 1);
@@ -759,17 +746,6 @@ public class QuickPlayScreen extends Screen {
                 drawCenteredScaledString(gfx, text, midX, y, scale, color);
             }
         }
-    }
-
-    private int findCurrentLineIndex(List<Lyrics.Line> lines, int curMs) {
-        if (lines == null || lines.isEmpty()) return -1;
-        int lo = 0, hi = lines.size() - 1, ans = -1;
-        while (lo <= hi) {
-            int mid = (lo + hi) >>> 1;
-            int t = lines.get(mid).timeMs;
-            if (t <= curMs) { ans = mid; lo = mid + 1; } else { hi = mid - 1; }
-        }
-        return ans;
     }
 
     private void drawCenteredScaledString(net.minecraft.client.gui.GuiGraphics gfx, String text, int midX, int y, float scale, int argb) {
@@ -865,16 +841,8 @@ public class QuickPlayScreen extends Screen {
 
     private boolean hasLyricsForCurrent() {
         if (currentPath == null) return false;
-        var infos = MusicLibrary.getTrackInfos();
-        if (infos == null || infos.isEmpty()) return false;
-        String cur = currentPath.toAbsolutePath().toString();
-        for (MusicLibrary.TrackInfo info : infos) {
-            if (info != null && info.getAudioPath() != null) {
-                String p = info.getAudioPath().toAbsolutePath().toString();
-                if (p.equalsIgnoreCase(cur)) return info.hasLyrics();
-            }
-        }
-        return false;
+        var info = MusicLibrary.findTrack(currentPath.toAbsolutePath().toString());
+        return info != null && info.hasLyrics();
     }
 
     private void updateLyricsStateForCurrent() {

@@ -27,7 +27,6 @@ import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import com.tqk114514.craftmusic.client.PlaybackController;
 import com.tqk114514.craftmusic.client.Lyrics;
-import com.tqk114514.craftmusic.client.LrcParser;
 import com.tqk114514.craftmusic.client.ClientConfig;
 
 @Mod(value = CraftMusic.MODID, dist = Dist.CLIENT)
@@ -256,29 +255,11 @@ public class CraftMusicClient {
         if (PLAYER == null || !PLAYER.isOutputReady()) return;
         String path = PLAYER.getLastPlayedAbsolutePath();
         if (path == null || path.isBlank()) return;
-        if (overlayLyricsForPath == null || !overlayLyricsForPath.equalsIgnoreCase(path)) {
-            Lyrics lyr = Lyrics.empty();
-            try {
-                var infos = MusicLibrary.getTrackInfos();
-                if (infos != null) {
-                    for (var info : infos) {
-                        if (info != null && info.getAudioPath() != null &&
-                                info.getAudioPath().toAbsolutePath().toString().equalsIgnoreCase(path)) {
-                            var lrc = info.getLyricsPath();
-                            if (lrc != null) lyr = LrcParser.parse(lrc);
-                            break;
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
-            overlayLyrics = lyr;
-            overlayLyricsForPath = path;
-        }
-        var lines = overlayLyrics != null ? overlayLyrics.getLines() : java.util.List.<Lyrics.Line>of();
+        var lines = loadOverlayLyrics(path).getLines();
         if (lines.isEmpty()) return;
         int curMs = 0;
         try { curMs = PLAYER.getPositionMs(); } catch (Throwable ignored) {}
-        int idx = findCurrentLineIndex(lines, curMs);
+        int idx = Lyrics.findLineIndexAt(lines, curMs);
         if (idx < 0 || idx >= lines.size()) return;
         String text = lines.get(idx).text;
         if (text == null || text.isBlank()) return;
@@ -327,15 +308,18 @@ public class CraftMusicClient {
         }
     }
 
-    private static int findCurrentLineIndex(java.util.List<Lyrics.Line> lines, int curMs) {
-        if (lines == null || lines.isEmpty()) return -1;
-        int lo = 0, hi = lines.size() - 1, ans = -1;
-        while (lo <= hi) {
-            int mid = (lo + hi) >>> 1;
-            int t = lines.get(mid).timeMs;
-            if (t <= curMs) { ans = mid; lo = mid + 1; } else { hi = mid - 1; }
+    /**
+     * 取当前播放曲目对应的歌词，结果按路径缓存；换曲时重新解析。
+     */
+    private static Lyrics loadOverlayLyrics(String absolutePath) {
+        if (absolutePath == null || absolutePath.isBlank()) return Lyrics.empty();
+        if (overlayLyrics != null && overlayLyricsForPath != null
+                && overlayLyricsForPath.equalsIgnoreCase(absolutePath)) {
+            return overlayLyrics;
         }
-        return ans;
+        overlayLyrics = MusicLibrary.loadLyrics(absolutePath);
+        overlayLyricsForPath = absolutePath;
+        return overlayLyrics;
     }
 
     // 提供当前位置的浮动歌词文本，供位置设置界面预览/拖拽
@@ -344,29 +328,10 @@ public class CraftMusicClient {
             if (PLAYER == null || !PLAYER.isOutputReady()) return null;
             String path = PLAYER.getLastPlayedAbsolutePath();
             if (path == null || path.isBlank()) return null;
-            if (overlayLyricsForPath == null || !overlayLyricsForPath.equalsIgnoreCase(path)) {
-                Lyrics lyr = Lyrics.empty();
-                try {
-                    var infos = MusicLibrary.getTrackInfos();
-                    if (infos != null) {
-                        for (var info : infos) {
-                            if (info != null && info.getAudioPath() != null &&
-                                    info.getAudioPath().toAbsolutePath().toString().equalsIgnoreCase(path)) {
-                                var lrc = info.getLyricsPath();
-                                if (lrc != null) lyr = LrcParser.parse(lrc);
-                                break;
-                            }
-                        }
-                    }
-                } catch (Throwable ignored) {}
-                overlayLyrics = lyr;
-                overlayLyricsForPath = path;
-            }
-            if (overlayLyrics == null) return null;
-            var lines = overlayLyrics.getLines();
-            if (lines == null || lines.isEmpty()) return null;
+            var lines = loadOverlayLyrics(path).getLines();
+            if (lines.isEmpty()) return null;
             int curMs = (PLAYER != null) ? PLAYER.getPositionMs() : 0;
-            int idx = findCurrentLineIndex(lines, curMs);
+            int idx = Lyrics.findLineIndexAt(lines, curMs);
             if (idx < 0 || idx >= lines.size()) return null;
             String text = lines.get(idx).text;
             return (text == null || text.isBlank()) ? null : text;

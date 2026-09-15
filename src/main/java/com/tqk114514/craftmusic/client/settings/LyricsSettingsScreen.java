@@ -9,13 +9,12 @@ import javax.annotation.Nonnull;
 
 import com.tqk114514.craftmusic.client.ClientConfig;
 import com.tqk114514.craftmusic.client.settings.lyrics.FloatingLyricsSettingsScreen;
-import com.tqk114514.craftmusic.util.NullSafetyUtils;
 
 public class LyricsSettingsScreen extends Screen {
     private final Screen parent;
 
     public LyricsSettingsScreen(Screen parent) {
-        super(NullSafetyUtils.safeTranslatable("craftmusic.ui.lyrics.settings"));
+        super(Component.translatable("craftmusic.ui.lyrics.settings"));
         this.parent = parent;
     }
 
@@ -24,44 +23,44 @@ public class LyricsSettingsScreen extends Screen {
         int y = this.height / 6 + 20;
 
         // 歌词效果 开/关
-        addRenderableWidget(NullSafetyUtils.safeButton(Button.builder(buildLyricEffectsLabel(), btn -> {
+        addRenderableWidget(Button.builder(buildLyricEffectsLabel(), btn -> {
             boolean v = !ClientConfig.isLyricEffects();
             ClientConfig.setLyricEffects(v);
             btn.setMessage(buildLyricEffectsLabel());
-        }).bounds(this.width / 2 - 100, y, 200, 20)));
+        }).bounds(this.width / 2 - 100, y, 200, 20).build());
 
         y += 24;
         // 悬浮歌词渲染（GLOBAL/WORLD）
-        addRenderableWidget(NullSafetyUtils.safeButton(Button.builder(buildFloatingLyricsRenderLabel(), btn -> {
+        addRenderableWidget(Button.builder(buildFloatingLyricsRenderLabel(), btn -> {
             String cur = ClientConfig.getFloatingLyricsRender();
             String next = "GLOBAL".equals(cur) ? "WORLD" : "GLOBAL";
             ClientConfig.setFloatingLyricsRender(next);
             btn.setMessage(buildFloatingLyricsRenderLabel());
-        }).bounds(this.width / 2 - 100, y, 200, 20)));
+        }).bounds(this.width / 2 - 100, y, 200, 20).build());
 
         y += 24;
         // 悬浮歌词设置（位置/颜色等）
-        addRenderableWidget(NullSafetyUtils.safeButton(Button.builder(NullSafetyUtils.safeTranslatable("craftmusic.ui.floating_lyrics.settings"), btn -> {
+        addRenderableWidget(Button.builder(Component.translatable("craftmusic.ui.floating_lyrics.settings"), btn -> {
             Minecraft.getInstance().setScreen(new FloatingLyricsSettingsScreen(this));
-        }).bounds(this.width / 2 - 100, y, 200, 20)));
+        }).bounds(this.width / 2 - 100, y, 200, 20).build());
 
         // 关闭
         int closeY = this.height - 30;
-        addRenderableWidget(NullSafetyUtils.safeButton(Button.builder(NullSafetyUtils.safeTranslatable("craftmusic.ui.close"), btn -> Minecraft.getInstance().setScreen(parent))
-                .bounds(this.width / 2 - 100, closeY, 200, 20)));
+        addRenderableWidget(Button.builder(Component.translatable("craftmusic.ui.close"), btn -> Minecraft.getInstance().setScreen(parent))
+                .bounds(this.width / 2 - 100, closeY, 200, 20).build());
     }
 
     @Nonnull
     private Component buildLyricEffectsLabel() {
         String key = ClientConfig.isLyricEffects() ? "craftmusic.ui.lyric_effects.on" : "craftmusic.ui.lyric_effects.off";
-        return NullSafetyUtils.safeTranslatable(key);
+        return Component.translatable(key);
     }
 
     @Nonnull
     private Component buildFloatingLyricsRenderLabel() {
         String scope = ClientConfig.getFloatingLyricsRender();
         String key = "GLOBAL".equals(scope) ? "craftmusic.ui.floating_lyrics.render.global" : "craftmusic.ui.floating_lyrics.render.world";
-        return NullSafetyUtils.safeTranslatable(key);
+        return Component.translatable(key);
     }
 
     @Override
@@ -74,5 +73,3 @@ public class LyricsSettingsScreen extends Screen {
         gfx.drawString(this.font, breadcrumb, x, 8, 0xFFFFFF, false);
     }
 }
-
-

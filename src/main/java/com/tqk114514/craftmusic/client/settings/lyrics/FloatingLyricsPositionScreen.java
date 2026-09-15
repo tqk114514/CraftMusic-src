@@ -14,6 +14,7 @@ public class FloatingLyricsPositionScreen extends Screen {
     private float posX;
     private float posY;
     private boolean dragging = false;
+    private boolean positionDirty = false;
     private int dragOffsetX = 0;
     private int dragOffsetY = 0;
 
@@ -193,8 +194,9 @@ public class FloatingLyricsPositionScreen extends Screen {
             }
             posX = clamp((float)anchorX / this.width);
             posY = clamp((float)anchorY / this.height);
-            // 实时写入配置，使真实悬浮歌词也随拖拽移动
-            ClientConfig.setFloatingLyricsPos(posX, posY);
+            // 只更新内存，落盘推迟到松手：本界面内全局悬浮歌词渲染已被跳过，
+            // 拖拽途中写文件没有任何可见效果，却会每帧写一次磁盘。
+            positionDirty = true;
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dx, dy);
@@ -202,7 +204,14 @@ public class FloatingLyricsPositionScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (dragging && button == 0) { dragging = false; return true; }
+        if (dragging && button == 0) {
+            dragging = false;
+            if (positionDirty) {
+                positionDirty = false;
+                ClientConfig.setFloatingLyricsPos(posX, posY);
+            }
+            return true;
+        }
         return super.mouseReleased(mouseX, mouseY, button);
     }
 

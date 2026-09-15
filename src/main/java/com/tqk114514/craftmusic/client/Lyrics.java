@@ -32,5 +32,29 @@ public final class Lyrics {
     public boolean isEmpty() { return lines.isEmpty(); }
 
     public static Lyrics empty() { return new Lyrics(List.of(), Map.of(), 0); }
+
+    /**
+     * 返回 timeMs 时刻所处的歌词行下标；若 timeMs 早于第一行，返回 -1。
+     * 歌词行按时间升序，用二分查找。
+     */
+    public static int findLineIndexAt(List<Line> lines, int timeMs) {
+        if (lines == null || lines.isEmpty()) return -1;
+        int lo = 0, hi = lines.size() - 1, ans = -1;
+        while (lo <= hi) {
+            int mid = (lo + hi) >>> 1;
+            if (lines.get(mid).timeMs <= timeMs) {
+                ans = mid;
+                lo = mid + 1;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        return ans;
+    }
+
+    /** {@link #findLineIndexAt(List, int)} 的实例版本，在本对象的行上查找。 */
+    public int findLineIndexAt(int timeMs) {
+        return findLineIndexAt(lines, timeMs);
+    }
 }
 
