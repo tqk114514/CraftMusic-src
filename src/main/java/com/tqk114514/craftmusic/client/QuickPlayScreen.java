@@ -3,6 +3,7 @@ package com.tqk114514.craftmusic.client;
 import com.tqk114514.craftmusic.CraftMusic;
 import com.tqk114514.craftmusic.audio.MiniaudioPlayer;
 import com.tqk114514.craftmusic.client.settings.SettingsScreen;
+import com.tqk114514.craftmusic.client.widget.SpectrumView;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
@@ -249,7 +250,7 @@ public class QuickPlayScreen extends Screen {
     public void extractRenderState(@Nonnull net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
         // 频谱作为“背景”先绘制，避免覆盖按钮/列表等UI
         if (ClientConfig.isSpectrumEnabled() && player != null && player.isOutputReady()) {
-            drawSpectrumBar(gfx);
+            spectrumView.extract(gfx, player, this.width, this.height);
         }
         super.extractRenderState(gfx, mouseX, mouseY, partialTick);
         gfx.text(this.font, Component.translatable("craftmusic.ui.title"), 2, 10 - 9, 0xFFFFFFFF, false);
@@ -269,34 +270,7 @@ public class QuickPlayScreen extends Screen {
         drawLyricsPanel(gfx);
     }
 
-    private final float[] spectrumBuf = new float[64];
-    private long lastSpectrumFetchMs = 0L;
-    private void drawSpectrumBar(net.minecraft.client.gui.GuiGraphicsExtractor gfx) {
-        int bands = 64;
-        long now = System.currentTimeMillis();
-        if (now - lastSpectrumFetchMs >= 33) { // ~30FPS
-            try { player.getSpectrum(spectrumBuf, bands); } catch (Throwable ignored) {}
-            lastSpectrumFetchMs = now;
-        }
-        int x0 = 2;  // 与列表等元素对齐，留2px边距
-        int x1 = this.width - 10;  // 右边保留10px边距
-        int yBottom = this.height - 4; // 靠近底缘
-        int barAreaHeight = yBottom; // 以屏幕高度为可用范围，不再额外限制
-        int width = x1 - x0;
-        int barGap = Math.max(1, width / (bands * 8));
-        int barW = Math.max(1, (width - (bands - 1) * barGap) / bands);
-        // 去除背景框，仅绘制柱状
-        float volScale = (player != null) ? Math.max(0f, Math.min(1f, player.getVolume())) : com.tqk114514.craftmusic.client.ClientConfig.getVolume();
-        for (int i = 0; i < bands; i++) {
-            float v = spectrumBuf[i] * volScale; // 随音量缩放振幅，不改变最大高度
-            if (v < 0f) v = 0f; if (v > 1f) v = 1f;
-            int h = (int)(v * (barAreaHeight - 4));
-            int bx = x0 + i * (barW + barGap);
-            int by = yBottom - h;
-            int color = 0xFFFFFFFF; // 纯白色
-            gfx.fill(bx, by, bx + barW, yBottom, color);
-        }
-    }
+    private final SpectrumView spectrumView = new SpectrumView();
 
     class TrackList extends ObjectSelectionList<TrackEntry> {
         private final int left = 2;  // 稍微留2px边距，避免文字超出
