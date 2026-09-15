@@ -31,3 +31,4 @@ gradle.properties.*.bak
 
 # local archive of historical builds (kept outside version control)
 本地/
+.workbuddy-ai/
