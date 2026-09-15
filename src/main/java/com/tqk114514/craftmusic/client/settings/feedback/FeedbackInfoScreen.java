@@ -53,7 +53,6 @@ public class FeedbackInfoScreen extends Screen {
 
     @Override
     public void extractRenderState(@Nonnull GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
-        this.extractBackground(gfx, mouseX, mouseY, partialTick);
         super.extractRenderState(gfx, mouseX, mouseY, partialTick);
         // 面包屑：设置 > 反馈 > （提交BUG/提交建议）
         String breadcrumb = Component.translatable("craftmusic.ui.settings").getString()

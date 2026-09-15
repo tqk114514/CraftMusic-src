@@ -46,7 +46,6 @@ public class FloatingLyricsPositionScreen extends Screen {
 
     @Override
     public void extractRenderState(@Nonnull GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
-        this.extractBackground(gfx, mouseX, mouseY, partialTick);
         // 先绘制UI，最后绘制预览与边框，避免被后续模糊影响
         super.extractRenderState(gfx, mouseX, mouseY, partialTick);
         float scale = ClientConfig.getFloatingLyricsFontScale();

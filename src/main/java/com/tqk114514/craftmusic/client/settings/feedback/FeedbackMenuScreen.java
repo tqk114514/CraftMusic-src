@@ -37,7 +37,6 @@ public class FeedbackMenuScreen extends Screen {
 
     @Override
     public void extractRenderState(@Nonnull net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
-        this.extractBackground(gfx, mouseX, mouseY, partialTick);
         super.extractRenderState(gfx, mouseX, mouseY, partialTick);
         String breadcrumb = Component.translatable("craftmusic.ui.settings").getString()
                 + " > " + Component.translatable("craftmusic.ui.feedback.menu").getString();

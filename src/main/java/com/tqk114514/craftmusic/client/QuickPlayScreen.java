@@ -247,7 +247,6 @@ public class QuickPlayScreen extends Screen {
 
     @Override
     public void extractRenderState(@Nonnull net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
-        this.extractBackground(gfx, mouseX, mouseY, partialTick);
         // 频谱作为“背景”先绘制，避免覆盖按钮/列表等UI
         if (ClientConfig.isSpectrumEnabled() && player != null && player.isOutputReady()) {
             drawSpectrumBar(gfx);
