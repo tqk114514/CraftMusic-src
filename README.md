@@ -59,3 +59,10 @@ CraftMusic now supports **12 languages** for a truly global experience:
 ### Troubleshooting
 - “Audio output not ready”: ensure the native DLL is properly loaded (Windows) and restart the game.
 - Chinese filenames not playing: the mod uses wide-character APIs on Windows; ensure the file exists and is readable.
+
+### License
+
+Released under the [MIT License](LICENSE).
+
+CraftMusic bundles [miniaudio](https://miniaud.io/) (public domain / MIT-0) as a prebuilt Windows DLL,
+and is built against the NeoForge MDK, whose template files are also MIT licensed.
