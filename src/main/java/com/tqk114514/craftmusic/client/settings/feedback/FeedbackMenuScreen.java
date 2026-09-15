@@ -41,7 +41,7 @@ public class FeedbackMenuScreen extends Screen {
         String breadcrumb = Component.translatable("craftmusic.ui.settings").getString()
                 + " > " + Component.translatable("craftmusic.ui.feedback.menu").getString();
         int x = (this.width - this.font.width(breadcrumb)) / 2;
-        gfx.text(this.font, breadcrumb, x, 8, 0xFFFFFF, false);
+        gfx.text(this.font, breadcrumb, x, 8, 0xFFFFFFFF, false);
     }
 }
 

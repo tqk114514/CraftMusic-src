@@ -252,12 +252,12 @@ public class QuickPlayScreen extends Screen {
             drawSpectrumBar(gfx);
         }
         super.extractRenderState(gfx, mouseX, mouseY, partialTick);
-        gfx.text(this.font, Component.translatable("craftmusic.ui.title"), 2, 10 - 9, 0xFFFFFF, false);
+        gfx.text(this.font, Component.translatable("craftmusic.ui.title"), 2, 10 - 9, 0xFFFFFFFF, false);
         if (currentPath != null && (isPlaying || (player != null && player.isPaused()))) {
             String name = currentPath.getFileName().toString();
             int textX = 2;  // 与其他元素对齐
             int textY = seekBarY - 12; // 显示在进度条上方，避免与底部按钮冲突
-            gfx.text(this.font, Component.literal(name), textX, textY, 0xFFFFFF, false);
+            gfx.text(this.font, Component.literal(name), textX, textY, 0xFFFFFFFF, false);
         }
 
         // 绘制进度条
@@ -396,7 +396,7 @@ public class QuickPlayScreen extends Screen {
             // 26.1 起条目位置不再作为参数传入，改由 LayoutElement 的几何信息取
             int textY = getY() + Math.max(0, (getHeight() - fh) / 2);
             int textX = getX() + 6;
-            gfx.text(QuickPlayScreen.this.font, name + "  [" + suffix + "]", textX, textY, 0xFFFFFF, false);
+            gfx.text(QuickPlayScreen.this.font, name + "  [" + suffix + "]", textX, textY, 0xFFFFFFFF, false);
         }
 
         @Override

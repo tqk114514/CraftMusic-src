@@ -57,7 +57,7 @@ public class SettingsScreen extends Screen {
         super.extractRenderState(gfx, mouseX, mouseY, partialTick);
         String breadcrumb = Component.translatable("craftmusic.ui.settings").getString();
         int x = (this.width - this.font.width(breadcrumb)) / 2;
-        gfx.text(this.font, breadcrumb, x, 8, 0xFFFFFF, false);
+        gfx.text(this.font, breadcrumb, x, 8, 0xFFFFFFFF, false);
     }
 }
 

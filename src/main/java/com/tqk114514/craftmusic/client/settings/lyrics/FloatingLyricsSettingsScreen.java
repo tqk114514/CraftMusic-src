@@ -119,7 +119,7 @@ public class FloatingLyricsSettingsScreen extends Screen {
                 + " > " + Component.translatable("craftmusic.ui.lyrics.settings").getString()
                 + " > " + Component.translatable("craftmusic.ui.floating_lyrics.settings").getString();
         int x = (this.width - this.font.width(breadcrumb)) / 2;
-        gfx.text(this.font, breadcrumb, x, 8, 0xFFFFFF, false);
+        gfx.text(this.font, breadcrumb, x, 8, 0xFFFFFFFF, false);
     }
 }
 

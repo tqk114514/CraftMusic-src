@@ -69,6 +69,6 @@ public class LyricsSettingsScreen extends Screen {
         String breadcrumb = Component.translatable("craftmusic.ui.settings").getString()
                 + " > " + Component.translatable("craftmusic.ui.lyrics.settings").getString();
         int x = (this.width - this.font.width(breadcrumb)) / 2;
-        gfx.text(this.font, breadcrumb, x, 8, 0xFFFFFF, false);
+        gfx.text(this.font, breadcrumb, x, 8, 0xFFFFFFFF, false);
     }
 }

@@ -107,7 +107,7 @@ public class FloatingLyricsColorScreen extends Screen {
                 + " > " + Component.translatable("craftmusic.ui.floating_lyrics.settings").getString()
                 + " > " + Component.translatable("craftmusic.ui.floating_lyrics.color.settings").getString();
         int xbc = (this.width - this.font.width(breadcrumb)) / 2;
-        gfx.text(this.font, breadcrumb, xbc, 8, 0xFFFFFF, false);
+        gfx.text(this.font, breadcrumb, xbc, 8, 0xFFFFFFFF, false);
         // 示例文本
         String sample = Component.translatable("craftmusic.ui.floating_lyrics.sample").getString();
         int color = ClientConfig.getFloatingLyricsColor();

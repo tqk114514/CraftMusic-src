@@ -59,7 +59,7 @@ public class FeedbackInfoScreen extends Screen {
                 + " > " + Component.translatable("craftmusic.ui.feedback.menu").getString()
                 + " > " + Component.translatable(tailKey).getString();
         int titleX = (this.width - this.font.width(breadcrumb)) / 2;
-        gfx.text(this.font, breadcrumb, titleX, 8, 0xFFFFFF, false);
+        gfx.text(this.font, breadcrumb, titleX, 8, 0xFFFFFFFF, false);
 
         // 正文：居中面板+居中对齐
         int panelPad = 10;
