@@ -9,6 +9,7 @@ import com.tqk114514.craftmusic.client.ClientConfig;
 
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import com.tqk114514.craftmusic.client.widget.Breadcrumb;
 import java.util.Locale;
 
 public class FloatingLyricsSettingsScreen extends Screen {
@@ -115,11 +116,8 @@ public class FloatingLyricsSettingsScreen extends Screen {
     @Override
     public void extractRenderState(@Nonnull net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
         super.extractRenderState(gfx, mouseX, mouseY, partialTick);
-        String breadcrumb = Component.translatable("craftmusic.ui.settings").getString()
-                + " > " + Component.translatable("craftmusic.ui.lyrics.settings").getString()
-                + " > " + Component.translatable("craftmusic.ui.floating_lyrics.settings").getString();
-        int x = (this.width - this.font.width(breadcrumb)) / 2;
-        gfx.text(this.font, breadcrumb, x, 8, 0xFFFFFFFF, false);
+        Breadcrumb.draw(gfx, this.font, this.width,
+                "craftmusic.ui.settings", "craftmusic.ui.lyrics.settings", "craftmusic.ui.floating_lyrics.settings");
     }
 }
 

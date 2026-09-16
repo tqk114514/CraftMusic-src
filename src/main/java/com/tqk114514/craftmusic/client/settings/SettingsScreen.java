@@ -5,6 +5,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import com.tqk114514.craftmusic.client.widget.Breadcrumb;
 import javax.annotation.Nonnull;
 
 import com.tqk114514.craftmusic.client.ClientConfig;
@@ -55,9 +56,7 @@ public class SettingsScreen extends Screen {
     @Override
     public void extractRenderState(@Nonnull GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
         super.extractRenderState(gfx, mouseX, mouseY, partialTick);
-        String breadcrumb = Component.translatable("craftmusic.ui.settings").getString();
-        int x = (this.width - this.font.width(breadcrumb)) / 2;
-        gfx.text(this.font, breadcrumb, x, 8, 0xFFFFFFFF, false);
+        Breadcrumb.draw(gfx, this.font, this.width, "craftmusic.ui.settings");
     }
 }
 

@@ -5,6 +5,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import com.tqk114514.craftmusic.client.widget.Breadcrumb;
 
 import javax.annotation.Nonnull;
 
@@ -102,12 +103,9 @@ public class FloatingLyricsColorScreen extends Screen {
     @Override
     public void extractRenderState(@Nonnull net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
         super.extractRenderState(gfx, mouseX, mouseY, partialTick);
-        String breadcrumb = Component.translatable("craftmusic.ui.settings").getString()
-                + " > " + Component.translatable("craftmusic.ui.lyrics.settings").getString()
-                + " > " + Component.translatable("craftmusic.ui.floating_lyrics.settings").getString()
-                + " > " + Component.translatable("craftmusic.ui.floating_lyrics.color.settings").getString();
-        int xbc = (this.width - this.font.width(breadcrumb)) / 2;
-        gfx.text(this.font, breadcrumb, xbc, 8, 0xFFFFFFFF, false);
+        Breadcrumb.draw(gfx, this.font, this.width,
+                "craftmusic.ui.settings", "craftmusic.ui.lyrics.settings",
+                "craftmusic.ui.floating_lyrics.settings", "craftmusic.ui.floating_lyrics.color.settings");
         // 示例文本
         String sample = Component.translatable("craftmusic.ui.floating_lyrics.sample").getString();
         int color = ClientConfig.getFloatingLyricsColor();

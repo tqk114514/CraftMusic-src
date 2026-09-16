@@ -6,6 +6,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import com.tqk114514.craftmusic.client.widget.Breadcrumb;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Util;
 
@@ -55,11 +56,8 @@ public class FeedbackInfoScreen extends Screen {
     public void extractRenderState(@Nonnull GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
         super.extractRenderState(gfx, mouseX, mouseY, partialTick);
         // 面包屑：设置 > 反馈 > （提交BUG/提交建议）
-        String breadcrumb = Component.translatable("craftmusic.ui.settings").getString()
-                + " > " + Component.translatable("craftmusic.ui.feedback.menu").getString()
-                + " > " + Component.translatable(tailKey).getString();
-        int titleX = (this.width - this.font.width(breadcrumb)) / 2;
-        gfx.text(this.font, breadcrumb, titleX, 8, 0xFFFFFFFF, false);
+        Breadcrumb.draw(gfx, this.font, this.width,
+                "craftmusic.ui.settings", "craftmusic.ui.feedback.menu", tailKey);
 
         // 正文：居中面板+居中对齐
         int panelPad = 10;
