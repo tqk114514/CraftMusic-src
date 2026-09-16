@@ -20,6 +20,13 @@ base {
     archivesName = mod_id
 }
 
+// 产物命名：craftmusic-<mod版本>-neoforge<MC版本>-<NeoForge版本>.jar
+// 直接指定 archiveFileName，否则 Gradle 会把 version 再追加一遍，
+// 变成 ...-26.1.2.100-1.2.0.jar 这种重复版本号的怪名字。
+tasks.named('jar', Jar).configure {
+    archiveFileName = "${mod_id}-${mod_version}-neoforge${minecraft_version}-${neo_version}.jar"
+}
+
 java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
 tasks.withType(JavaCompile).configureEach {
