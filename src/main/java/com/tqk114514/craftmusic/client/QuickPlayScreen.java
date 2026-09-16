@@ -4,6 +4,7 @@ import com.tqk114514.craftmusic.CraftMusic;
 import com.tqk114514.craftmusic.audio.MiniaudioPlayer;
 import com.tqk114514.craftmusic.client.settings.SettingsScreen;
 import com.tqk114514.craftmusic.client.widget.SeekBarView;
+import com.tqk114514.craftmusic.client.widget.TrackListWidget;
 import com.tqk114514.craftmusic.client.widget.SpectrumView;
 import com.tqk114514.craftmusic.client.widget.VolumeBarView;
 
@@ -19,9 +20,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public class QuickPlayScreen extends Screen {
+public class QuickPlayScreen extends Screen implements TrackListWidget.Listener {
     private final MiniaudioPlayer player;
-    private TrackList trackList;
+    private TrackListWidget trackList;
     private EditBox searchBox;   // 搜索框
     private Button prevBtn;      // 保留引用以更新启用状态
     private Button playToggleBtn; // 更新按钮文本
@@ -35,9 +36,6 @@ public class QuickPlayScreen extends Screen {
     private int selectedIndex = -1;
     private boolean isPlaying = false;
     private Path currentPath = null; // 预留：后续可用于高亮/元数据展示
-    private long lastClickMs = 0L;
-    private Path lastClickedPath = null;
-    private static final int DOUBLE_CLICK_MS = 350;
     private final SeekBarView seekBar = new SeekBarView();
     // 保留字段移除，逻辑由后台控制器处理
     // 音量条
@@ -104,7 +102,7 @@ public class QuickPlayScreen extends Screen {
         addRenderableWidget(searchBox);
         
         // 创建列表
-        trackList = new TrackList(minecraft, leftWidth - 2, listHeight, listTop, 20);  // 宽度减2补偿左边距
+        trackList = new TrackListWidget(minecraft, this.font, leftWidth - 2, listHeight, listTop, 20, this);  // 宽度减2补偿左边距
         addRenderableWidget(trackList);
         
         // 初始化过滤列表
@@ -262,133 +260,15 @@ public class QuickPlayScreen extends Screen {
 
     private final SpectrumView spectrumView = new SpectrumView();
 
-    class TrackList extends ObjectSelectionList<TrackEntry> {
-        private final int left = 2;  // 稍微留2px边距，避免文字超出
-        private final int listWidth;
-        
-        public TrackList(Minecraft mc, int width, int height, int top, int itemHeight) {
-            super(mc, width, height, top, itemHeight);
-            this.listWidth = width;
-            reloadInfos(MusicLibrary.getTrackInfos());
-        }
-
-        @Override
-        public int getRowLeft() {
-            return this.left;
-        }
-
-        @Override
-        protected int scrollBarX() {
-            return this.left + this.listWidth - 6;
-        }
-
-        @Override
-        public int getRowWidth() {
-            return this.listWidth - 8; // 给滚动条留出空间
-        }
-
-        void reload(List<Path> paths) {
-            clearEntries();
-            int i = 0;
-            for (Path p : paths) {
-                addEntry(new TrackEntry(this, p, i++));
-            }
-            if (selectedIndex >= 0 && selectedIndex < getItemCount()) {
-                setSelected(children().get(selectedIndex));
-            }
-            QuickPlayScreen.this.updateControlsEnabled();
-        }
-
-        void reloadInfos(List<MusicLibrary.TrackInfo> infos) {
-            clearEntries();
-            int i = 0;
-            for (MusicLibrary.TrackInfo info : infos) {
-                addEntry(new TrackEntry(this, info.getAudioPath(), i++, info.hasLyrics()));
-            }
-            if (selectedIndex >= 0 && selectedIndex < getItemCount()) {
-                setSelected(children().get(selectedIndex));
-            }
-            QuickPlayScreen.this.updateControlsEnabled();
-        }
-        
-        void reloadFilteredInfos(List<MusicLibrary.TrackInfo> infos) {
-            clearEntries();
-            int i = 0;
-            for (MusicLibrary.TrackInfo info : infos) {
-                addEntry(new TrackEntry(this, info.getAudioPath(), i++, info.hasLyrics()));
-            }
-            if (!infos.isEmpty()) {
-                selectedIndex = 0;
-                setSelected(children().get(0));
-            }
-            QuickPlayScreen.this.updateControlsEnabled();
-        }
-
-        void selectIndex(int index) {
-            if (index >= 0 && index < getItemCount()) {
-                setSelected(children().get(index));
-            }
-            QuickPlayScreen.this.updateControlsEnabled();
-        }
+    @Override
+    public void onSelectionChanged(int index) {
+        this.selectedIndex = index;
+        updateControlsEnabled();
     }
 
-    class TrackEntry extends ObjectSelectionList.Entry<TrackEntry> {
-        private final Path path;
-        private final TrackList parent;
-        private final int index;
-        private final boolean hasLyrics;
-
-        TrackEntry(TrackList parent, Path path, int index) {
-            this.parent = parent;
-            this.path = path;
-            this.index = index;
-            this.hasLyrics = false;
-        }
-
-        TrackEntry(TrackList parent, Path path, int index, boolean hasLyrics) {
-            this.parent = parent;
-            this.path = path;
-            this.index = index;
-            this.hasLyrics = hasLyrics;
-        }
-
-        @Override
-        public void extractContent(net.minecraft.client.gui.GuiGraphicsExtractor gfx, int mouseX, int mouseY, boolean hovered, float partialTick) {
-            String name = path.getFileName().toString();
-            String suffix = hasLyrics ? Component.translatable("craftmusic.ui.has_lyrics").getString() : Component.translatable("craftmusic.ui.no_lyrics").getString();
-            int fh = QuickPlayScreen.this.font.lineHeight;
-            // 26.1 起条目位置不再作为参数传入，改由 LayoutElement 的几何信息取
-            int textY = getY() + Math.max(0, (getHeight() - fh) / 2);
-            int textX = getX() + 6;
-            gfx.text(QuickPlayScreen.this.font, name + "  [" + suffix + "]", textX, textY, 0xFFFFFFFF, false);
-        }
-
-        @Override
-        public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
-        double mouseX = event.x(); double mouseY = event.y(); int button = event.button();
-            if (button != 0) return false;
-            // 选择该项
-            parent.setSelected(this);
-            selectedIndex = this.index;
-
-            long now = System.currentTimeMillis();
-            boolean isDoubleClick = (lastClickedPath != null && lastClickedPath.equals(this.path) && (now - lastClickMs) <= DOUBLE_CLICK_MS);
-            lastClickedPath = this.path;
-            lastClickMs = now;
-
-            if (isDoubleClick) {
-                // 双击播放
-                playTrack(this.path, this.index);
-            }
-            return true;
-        }
-
-        @Override
-        public @Nonnull Component getNarration() {
-            String name = path.getFileName().toString();
-            String suffix = hasLyrics ? Component.translatable("craftmusic.ui.has_lyrics").getString() : Component.translatable("craftmusic.ui.no_lyrics").getString();
-            return Component.literal(name + " [" + suffix + "]");
-        }
+    @Override
+    public void onPlay(Path path, int index) {
+        playTrack(path, index);
     }
 
     private void playPrev() {
