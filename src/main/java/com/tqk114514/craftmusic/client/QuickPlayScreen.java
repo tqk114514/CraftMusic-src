@@ -12,7 +12,6 @@ import com.tqk114514.craftmusic.client.widget.VolumeBarView;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import javax.annotation.Nonnull;
@@ -383,13 +382,6 @@ public class QuickPlayScreen extends Screen implements TrackListWidget.Listener 
             return true;
         }
         return super.mouseReleased(event);
-    }
-
-    private static String formatTime(int ms) {
-        int totalSec = Math.max(0, ms / 1000);
-        int m = totalSec / 60;
-        int s = totalSec % 60;
-        return String.format("%d:%02d", m, s);
     }
 
     // 自动切歌交由后台控制器处理
