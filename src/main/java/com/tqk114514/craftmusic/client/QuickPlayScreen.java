@@ -3,6 +3,7 @@ package com.tqk114514.craftmusic.client;
 import com.tqk114514.craftmusic.CraftMusic;
 import com.tqk114514.craftmusic.audio.MiniaudioPlayer;
 import com.tqk114514.craftmusic.client.settings.SettingsScreen;
+import com.tqk114514.craftmusic.client.widget.LyricsPanelView;
 import com.tqk114514.craftmusic.client.widget.SeekBarView;
 import com.tqk114514.craftmusic.client.widget.TrackListWidget;
 import com.tqk114514.craftmusic.client.widget.SpectrumView;
@@ -41,27 +42,9 @@ public class QuickPlayScreen extends Screen implements TrackListWidget.Listener 
     // 音量条
     private final VolumeBarView volumeBar = new VolumeBarView();
     // 播放模式改为由全局控制器管理
-    // 固定显示歌词（按钮不再控制）
-    private Lyrics currentLyrics = Lyrics.empty();
-    private String lyricsLoadedForPath = null;
-    // 歌词滚动（物理）
-    private float lyricScrollPos = -1f;
-    private float lyricScrollVel = 0f;
-    private long lyricLastUpdateMs = 0L;
-    private static final float SCROLL_SPRING_K = 60f; // 弹性系数
-    private static final float SCROLL_DAMP_C = (float)(2.0 * Math.sqrt(SCROLL_SPRING_K)); // 临界阻尼
-    private static final float MAX_DT = 0.05f; // 防止卡顿帧跳跃
-    // 当前行缩放动画（+8%）
-    private int scaleCurrentIndex = -1;
-    private int scalePrevIndex = -1;
-    private long scaleAnimStartMs = 0L;
-    private static final int SCALE_ANIM_MS = 180;
-    // 无歌词时提示的缩放动画
-    private boolean noLyricsActive = false;
-    private long noLyricsAnimStartMs = 0L;
-    // 歌词面板位置
-    private int lyricsTopY;    // 歌词面板顶部位置
-    private int lyricsBottomY; // 歌词面板底部位置
+    // 歌词面板：几何、滚动/缩放动画状态全部归组件所有
+    private final LyricsPanelView lyricsPanel = new LyricsPanelView();
+    private String lyricsLoadedForPath = null; // 仅用于判断是否需要重新解析歌词
 
     public QuickPlayScreen(MiniaudioPlayer player) {
         super(Component.literal("CraftMusic Quick Play"));
@@ -85,8 +68,7 @@ public class QuickPlayScreen extends Screen implements TrackListWidget.Listener 
         // 右侧歌词面板保持原来的高度，不受搜索框影响
         int lyricsTop = 40; // 原始高度
         int lyricsHeight = Math.max(20, this.height - lyricsTop - listBottomPadding);
-        this.lyricsTopY = lyricsTop;
-        this.lyricsBottomY = lyricsTop + lyricsHeight;
+        lyricsPanel.layout(lyricsTop, lyricsHeight);
         
         // 左右分栏
         int midGap = 10;
@@ -255,7 +237,7 @@ public class QuickPlayScreen extends Screen implements TrackListWidget.Listener 
         // 同步显示与索引（全局控制器可能已切歌）
         syncFromPlayer();
         // 绘制右侧歌词
-        drawLyricsPanel(gfx);
+        lyricsPanel.extract(gfx, this.font, player, this.width, ClientConfig.isLyricEffects());
     }
 
     private final SpectrumView spectrumView = new SpectrumView();
@@ -414,144 +396,16 @@ public class QuickPlayScreen extends Screen implements TrackListWidget.Listener 
 
     private void loadLyricsForCurrent() {
         if (currentPath == null) {
-            currentLyrics = Lyrics.empty();
+            lyricsPanel.setLyrics(Lyrics.empty());
             lyricsLoadedForPath = null;
             return;
         }
         String cur = currentPath.toAbsolutePath().toString();
         if (cur.equalsIgnoreCase(lyricsLoadedForPath)) return;
-        currentLyrics = MusicLibrary.loadLyrics(cur);
+        lyricsPanel.setLyrics(MusicLibrary.loadLyrics(cur));
         lyricsLoadedForPath = cur;
     }
 
-    private void drawLyricsPanel(net.minecraft.client.gui.GuiGraphicsExtractor gfx) {
-        // 左右分栏：左列表贴左边，右边保留10px边距
-        int gap = 10;
-        int rightPadding = 10;
-        int leftWidth = (this.width - rightPadding - gap) / 2;
-        int x0 = leftWidth + gap;  // 左列表宽度 + 中间间隔
-        int x1 = this.width - 10;
-        int top = this.lyricsTopY;    // 使用歌词面板专用的高度
-        int bottom = this.lyricsBottomY;
-        gfx.fill(x0, top, x1, bottom, 0x90000000);
-
-        // 固定显示歌词（按钮不再控制）。若无歌词，显示“无歌词/纯音乐”并居中放大 8%。
-        List<Lyrics.Line> lines = (currentLyrics != null) ? currentLyrics.getLines() : java.util.Collections.emptyList();
-        if (lines.isEmpty()) {
-            String txt = Component.translatable("craftmusic.ui.no_lyrics_or_instrumental").getString();
-            int centerY = this.lyricsTopY + 8 + (this.lyricsBottomY - this.lyricsTopY - 16) / 2 - this.font.lineHeight / 2;
-            int midX = (x0 + x1) / 2;
-            if (ClientConfig.isLyricEffects()) {
-                long now = System.currentTimeMillis();
-                if (!noLyricsActive) { noLyricsActive = true; noLyricsAnimStartMs = now; }
-                float t = Math.max(0f, Math.min(1f, (now - noLyricsAnimStartMs) / (float)SCALE_ANIM_MS));
-                float eased = (t < 0.5f) ? (4f * t * t * t) : (1f - (float)Math.pow(-2f * t + 2f, 3f) / 2f);
-                float scale = 1.0f + 0.08f * eased;
-                drawCenteredScaledString(gfx, txt, midX, centerY, scale, 0xFFFFFFFF);
-            } else {
-                noLyricsActive = false;
-                int tx = midX - this.font.width(txt) / 2;
-                gfx.text(this.font, txt, tx, centerY, 0xFFFFFFFF, false);
-            }
-            return;
-        } else {
-            noLyricsActive = false;
-        }
-        int curMs = (player != null) ? player.getPositionMs() : 0;
-        int curIdx = Lyrics.findLineIndexAt(lines, curMs);
-        long now = System.currentTimeMillis();
-        if (!ClientConfig.isLyricEffects()) {
-            lyricScrollPos = (curIdx < 0) ? 0f : Math.min(curIdx, lines.size() - 1);
-            lyricScrollVel = 0f;
-            lyricLastUpdateMs = now;
-        } else {
-            if (lyricLastUpdateMs == 0L || lyricScrollPos < 0f) {
-                lyricScrollPos = (curIdx < 0) ? 0f : Math.min(curIdx, lines.size() - 1);
-                lyricScrollVel = 0f;
-                lyricLastUpdateMs = now;
-            } else {
-                float target = (curIdx < 0) ? 0f : Math.min(curIdx, lines.size() - 1);
-                // 跳跃过大时直接对齐，避免长距离拖尾
-                if (Math.abs(target - lyricScrollPos) > 3f) {
-                    lyricScrollPos = target;
-                    lyricScrollVel = 0f;
-                } else {
-                    float dt = Math.min(MAX_DT, (now - lyricLastUpdateMs) / 1000f);
-                    float delta = target - lyricScrollPos;
-                    float accel = SCROLL_SPRING_K * delta - SCROLL_DAMP_C * lyricScrollVel;
-                    lyricScrollVel += accel * dt;
-                    lyricScrollPos += lyricScrollVel * dt;
-                }
-                lyricLastUpdateMs = now;
-            }
-        }
-        int lineH = this.font.lineHeight + 2;
-        int centerY = this.lyricsTopY + 8 + (this.lyricsBottomY - this.lyricsTopY - 16) / 2 - this.font.lineHeight / 2;
-        int midX = (x0 + x1) / 2;
-        // 缩放动画：当当前歌词行变化时，前一行缩回，当前行放大
-        if (ClientConfig.isLyricEffects()) {
-            if (scaleCurrentIndex != curIdx) {
-                scalePrevIndex = scaleCurrentIndex;
-                scaleCurrentIndex = curIdx;
-                scaleAnimStartMs = now;
-            }
-        } else {
-            scaleCurrentIndex = -1;
-            scalePrevIndex = -1;
-        }
-        // 使用连续滚动位置绘制
-        float drawCenterIndex = (lyricScrollPos < 0f) ? (curIdx < 0 ? 0f : curIdx) : lyricScrollPos;
-        int visiblePx = Math.max(0, (this.lyricsBottomY - this.lyricsTopY - 16)); // 上下各 8px 内边距
-        int approxVisibleLines = Math.max(1, visiblePx / lineH + 1);
-        int half = approxVisibleLines / 2;
-        int firstIdx = Math.max(0, (int)Math.floor(drawCenterIndex) - half);
-        int lastIdx = Math.min(lines.size() - 1, (int)Math.ceil(drawCenterIndex) + half);
-        int textTopBound = this.lyricsTopY + 8;
-        int textBottomBound = this.lyricsBottomY - 8 - this.font.lineHeight;
-        for (int i = firstIdx; i <= lastIdx; i++) {
-            float diff = i - drawCenterIndex;
-            int y = Math.round(centerY + diff * lineH);
-            if (y < textTopBound || y > textBottomBound) continue;
-            String text = lines.get(i).text;
-            int tx = midX - this.font.width(text) / 2;
-            int color = (i == curIdx) ? 0xFFFFFFFF : 0xFFAAAAAA;
-            if (!ClientConfig.isLyricEffects()) {
-                gfx.text(this.font, text, tx, y, color, false);
-            } else {
-                float t = Math.max(0f, Math.min(1f, (now - scaleAnimStartMs) / (float)SCALE_ANIM_MS));
-                // easeInOutCubic
-                float eased = (t < 0.5f) ? (4f * t * t * t) : (1f - (float)Math.pow(-2f * t + 2f, 3f) / 2f);
-                float scale;
-                if (i == scaleCurrentIndex) {
-                    scale = 1.0f + 0.08f * eased;
-                } else if (i == scalePrevIndex) {
-                    scale = 1.08f - 0.08f * eased;
-                } else {
-                    scale = 1.0f;
-                }
-                drawCenteredScaledString(gfx, text, midX, y, scale, color);
-            }
-        }
-    }
-
-    private void drawCenteredScaledString(net.minecraft.client.gui.GuiGraphicsExtractor gfx, String text, int midX, int y, float scale, int argb) {
-        if (scale <= 0f) return;
-        if (Math.abs(scale - 1f) < 0.001f) {
-            int tx = midX - this.font.width(text) / 2;
-            gfx.text(this.font, text, tx, y, argb, false);
-            return;
-        }
-        var pose = gfx.pose();
-        pose.pushMatrix();
-        float textW = this.font.width(text);
-        float scaledW = textW * scale;
-        float tx = midX - scaledW / 2f;
-        pose.translate(tx, y);
-        pose.scale(scale, scale);
-        gfx.text(this.font, text, 0, 0, argb, false);
-        pose.popMatrix();
-    }
-    
     private void filterTracks(String searchText) {
         if (searchText == null || searchText.isBlank()) {
             filteredTracks = new ArrayList<>(MusicLibrary.getTrackInfos());
