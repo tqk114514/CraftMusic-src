@@ -47,8 +47,21 @@ CraftMusic now supports **12 languages** for a truly global experience:
 - `floatingLyricsPosition`: `TOP_LEFT` | `TOP_RIGHT` | `BOTTOM_LEFT` | `BOTTOM_RIGHT`
 
 ### Requirements
-- Client-side, NeoForge-based Minecraft.
+- Minecraft **26.1.2**
+- NeoForge **26.1.2.100** or newer
+- Client-side installation (the mod does nothing on a dedicated server).
 - Windows only. The native audio backend (miniaudio) is distributed as a Windows DLL.
+
+Looking for an older Minecraft version? See the [branch list](#supported-versions) below —
+each Minecraft version has its own long-lived branch, and the release tags indicate both
+the mod version and the Minecraft version (for example `v1.2.0-mc26.1.2`).
+
+### Supported Versions
+| Minecraft | Branch | Status |
+| --- | --- | --- |
+| 26.1.2 | `mc-26.1.2` | Active — this is the default branch |
+| 1.21.1 | `mc-1.21.1` | Maintenance (crash fixes only) |
+| 1.21.2 – 1.21.5 | `mc-1.21.2` … `mc-1.21.5` | Frozen, no longer updated |
 
 ### Limitations
 - Windows platform only.
